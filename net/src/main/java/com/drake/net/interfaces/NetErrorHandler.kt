@@ -31,6 +31,7 @@ import com.drake.net.R
 import com.drake.net.exception.*
 import com.drake.net.utils.TipUtils
 import java.net.UnknownHostException
+import java.util.concurrent.CancellationException
 
 interface NetErrorHandler {
 
@@ -42,6 +43,7 @@ interface NetErrorHandler {
      * @param e 发生的错误
      */
     fun onError(e: Throwable) {
+        if (e is CancellationException || e.cause is CancellationException) return
         val message = when (e) {
             is UnknownHostException -> NetConfig.app.getString(R.string.net_host_error)
             is URLParseException -> NetConfig.app.getString(R.string.net_url_error)
@@ -73,6 +75,7 @@ interface NetErrorHandler {
      * @param view 缺省页, StateLayout或者PageRefreshLayout
      */
     fun onStateError(e: Throwable, view: View) {
+        if (e is CancellationException || e.cause is CancellationException) return
         when (e) {
             is ConvertException,
             is RequestParamsException,

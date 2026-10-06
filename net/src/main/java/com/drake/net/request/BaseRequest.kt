@@ -35,7 +35,9 @@ import com.drake.net.okhttp.toNetOkhttp
 import com.drake.net.reflect.typeTokenOf
 import com.drake.net.response.convert
 import com.drake.net.tag.NetTag
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.Job
 import okhttp3.*
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -43,6 +45,7 @@ import java.io.File
 import java.lang.reflect.Type
 import java.net.URL
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.coroutineContext
 import kotlin.reflect.typeOf
 
 abstract class BaseRequest {
@@ -449,6 +452,9 @@ abstract class BaseRequest {
     //<editor-fold desc="SyncRequest">
     /**
      * 执行同步请求
+     *
+     * 注意：同步 API 不会自动绑定协程 [Job]；取消请自行 [Call.cancel]，
+     * 或在协程内改用 [awaitExecute]。
      */
     @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified R> execute(): R {
@@ -462,6 +468,10 @@ abstract class BaseRequest {
     /**
      * 执行同步请求
      * 本方法仅为兼容Java使用存在
+     *
+     * 注意：同步 API 不会自动绑定协程 [Job]；取消请自行 [Call.cancel]，
+     * 或在协程内改用 [awaitExecute]。
+     *
      * @param type 如果存在泛型嵌套要求使用[typeTokenOf]获取, 否则泛型会被擦除导致无法解析
      */
     fun <R> execute(type: Type): R {
@@ -473,6 +483,10 @@ abstract class BaseRequest {
 
     /**
      * 执行同步请求
+     *
+     * 注意：同步 API 不会自动绑定协程 [Job]；取消请自行 [Call.cancel]，
+     * 或在协程内改用 [awaitExecute]。
+     *
      * @return 一个包含请求成功和错误的Result
      */
     inline fun <reified R> toResult(): Result<R> {
@@ -485,6 +499,45 @@ abstract class BaseRequest {
             Result.success(value)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    /**
+     * 在协程中执行请求，并将当前 [Job] 取消绑定到 OkHttp [Call.cancel]。
+     * [com.drake.net.Get] 等异步 API 内部使用本方法。
+     */
+    @OptIn(ExperimentalStdlibApi::class)
+    suspend inline fun <reified R> awaitExecute(): R {
+        NetConfig.requestInterceptor?.interceptor(this)
+        setKType<R>()
+        val request = buildRequest()
+        val newCall = okHttpClient.newCall(request)
+        val job = coroutineContext[Job]
+        val cancelHandle = job?.invokeOnCompletion { cause ->
+            if (cause is CancellationException) newCall.cancel()
+        }
+        try {
+            return newCall.execute().convert()
+        } finally {
+            cancelHandle?.dispose()
+        }
+    }
+
+    /**
+     * 在协程中执行请求（Java / Type Token），并将当前 [Job] 取消绑定到 OkHttp [Call.cancel]。
+     */
+    suspend fun <R> awaitExecute(type: Type): R {
+        NetConfig.requestInterceptor?.interceptor(this)
+        val request = buildRequest()
+        val newCall = okHttpClient.newCall(request)
+        val job = coroutineContext[Job]
+        val cancelHandle = job?.invokeOnCompletion { cause ->
+            if (cause is CancellationException) newCall.cancel()
+        }
+        try {
+            return newCall.execute().convert(type)
+        } finally {
+            cancelHandle?.dispose()
         }
     }
     //</editor-fold>

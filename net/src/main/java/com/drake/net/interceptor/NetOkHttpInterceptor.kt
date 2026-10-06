@@ -37,6 +37,7 @@ import com.drake.net.exception.NetUnknownHostException
 import com.drake.net.exception.NoCacheException
 import com.drake.net.request.tagOf
 import com.drake.net.tag.NetTag
+import kotlinx.coroutines.CancellationException
 import okhttp3.CacheControl
 import okhttp3.Interceptor
 import okhttp3.Response
@@ -93,6 +94,8 @@ object NetOkHttpInterceptor : Interceptor {
             }
             response = response.newBuilder().body(respBody).build()
             return response
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: SocketTimeoutException) {
             throw NetSocketTimeoutException(request, e.message, e)
         } catch (e: ConnectException) {
@@ -102,6 +105,9 @@ object NetOkHttpInterceptor : Interceptor {
         } catch (e: NetException) {
             throw e
         } catch (e: Throwable) {
+            if (chain.call().isCanceled() || e.message.equals("Canceled", ignoreCase = true)) {
+                throw CancellationException(e.message, e)
+            }
             throw HttpFailureException(request, cause = e)
         } finally {
             if (response?.body == null) {
