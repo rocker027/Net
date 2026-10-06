@@ -32,8 +32,8 @@ import com.drake.net.reflect.typeTokenOf
 import com.drake.net.request.*
 import com.drake.net.tag.NetTag
 import com.drake.net.utils.md5
+import com.drake.net.okhttp.closeQuietly
 import okhttp3.Response
-import okhttp3.internal.closeQuietly
 import okio.buffer
 import okio.sink
 import java.io.File

@@ -26,10 +26,10 @@ package com.drake.net.request
 
 import com.drake.net.convert.NetConverter
 import com.drake.net.interfaces.ProgressListener
+import com.drake.net.okhttp.NetRequestMeta
 import com.drake.net.tag.NetTag
 import kotlinx.coroutines.CoroutineExceptionHandler
 import okhttp3.Headers
-import okhttp3.OkHttpUtils
 import okhttp3.Request
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.reflect.KType
@@ -71,10 +71,17 @@ var Request.Builder.kType: KType?
     }
 
 /**
- * 全部的请求头
+ * 全部的请求头（Builder 階段側車，build 前會 flush 到公開 Headers API）
  */
 fun Request.Builder.headers(): Headers.Builder {
-    return OkHttpUtils.headers(this)
+    return NetRequestMeta.headers(this)
+}
+
+/**
+ * 將側車 tags／headers 寫入公開 OkHttp Builder API。應在 [Request.Builder.build] 之前呼叫。
+ */
+fun Request.Builder.flushNetMeta(): Request.Builder = apply {
+    NetRequestMeta.flush(this)
 }
 //</editor-fold>
 
@@ -119,14 +126,20 @@ inline fun <reified T> Request.Builder.tagOf(): T? {
  * 设置OkHttp的tag(通过Class区分的tag)
  */
 inline fun <reified T> Request.Builder.tagOf(value: T?) = apply {
+    val map = tags()
+    if (value == null) {
+        map.remove(T::class.java)
+    } else {
+        map[T::class.java] = value
+    }
     tag(T::class.java, value)
 }
 
 /**
- * 全部tag
+ * 全部 tag（Builder 側車 map；與公開 [Request.Builder.tag] 同步維護）
  */
 fun Request.Builder.tags(): MutableMap<Class<*>, Any?> {
-    return OkHttpUtils.tags(this)
+    return NetRequestMeta.tags(this)
 }
 //</editor-fold>
 

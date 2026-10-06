@@ -27,7 +27,6 @@ package com.drake.net.request
 
 import com.drake.net.NetConfig
 import com.drake.net.cache.CacheMode
-import com.drake.net.cache.ForceCache
 import com.drake.net.convert.NetConverter
 import com.drake.net.exception.URLParseException
 import com.drake.net.interfaces.ProgressListener
@@ -65,8 +64,7 @@ abstract class BaseRequest {
     open var okHttpClient = NetConfig.okHttpClient
         set(value) {
             field = value.toNetOkhttp()
-            val forceCache = field.cache?.let { ForceCache(OkHttpUtils.diskLruCache(it)) }
-            tagOf(forceCache)
+            // P0：不再自動掛載 ForceCache（已移除 OkHttp internal DiskLruCache 依賴）
         }
 
     /**
@@ -285,28 +283,34 @@ abstract class BaseRequest {
      * 如果已存在相同`name`的请求头会添加而不会覆盖, 因为请求头本身存在多个值
      */
     fun addHeader(name: String, value: String) {
-        okHttpRequest.addHeader(name, value)
+        okHttpRequest.headers().add(name, value)
     }
 
     /**
      * 设置请求头, 会覆盖请求头而不像[addHeader]是添加
      */
     fun setHeader(name: String, value: String) {
-        okHttpRequest.header(name, value)
+        okHttpRequest.headers().set(name, value)
     }
 
     /**
      * 删除请求头
      */
     fun removeHeader(name: String) {
-        okHttpRequest.removeHeader(name)
+        okHttpRequest.headers().removeAll(name)
     }
 
     /**
      * 批量设置请求头
      */
     fun setHeaders(headers: Headers) {
-        okHttpRequest.headers(headers)
+        val builder = okHttpRequest.headers()
+        for (name in headers.names()) {
+            builder.removeAll(name)
+        }
+        for (i in 0 until headers.size) {
+            builder.add(headers.name(i), headers.value(i))
+        }
     }
 
     /**
@@ -440,7 +444,19 @@ abstract class BaseRequest {
      * 构建请求对象Request
      */
     open fun buildRequest(): Request {
-        return okHttpRequest.method(method.name, null)
+        // 預置可變容器，讓進行中請求仍可對同一 queue 加 listener（無需改 Request tag map）
+        if (okHttpRequest.tagOf<NetTag.Extras>() == null) {
+            okHttpRequest.tagOf(NetTag.Extras())
+        }
+        if (okHttpRequest.tagOf<NetTag.UploadListeners>() == null) {
+            okHttpRequest.tagOf(NetTag.UploadListeners())
+        }
+        if (okHttpRequest.tagOf<NetTag.DownloadListeners>() == null) {
+            okHttpRequest.tagOf(NetTag.DownloadListeners())
+        }
+        return okHttpRequest
+            .flushNetMeta()
+            .method(method.name, null)
             .url(httpUrl.build())
             .setConverter(converter)
             .build()

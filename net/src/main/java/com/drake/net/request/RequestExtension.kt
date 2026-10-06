@@ -29,7 +29,6 @@ import com.drake.net.convert.NetConverter
 import com.drake.net.interfaces.ProgressListener
 import com.drake.net.tag.NetTag
 import kotlinx.coroutines.CoroutineExceptionHandler
-import okhttp3.OkHttpUtils
 import okhttp3.Request
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.reflect.KType
@@ -80,15 +79,11 @@ fun Request.extra(name: String): Any? {
 }
 
 /**
- * 全部额外信息
+ * 全部额外信息。
+ * 已 build 的 Request 無法透過公開 API 新增 tag；請在 Builder 階段預置 [NetTag.Extras]。
  */
 fun Request.extras(): HashMap<String, Any?> {
-    val tags = tags()
-    return tags[NetTag.Extras::class.java] as NetTag.Extras? ?: kotlin.run {
-        val tag = NetTag.Extras()
-        tags[NetTag.Extras::class.java] = tag
-        tag
-    }
+    return tagOf<NetTag.Extras>() ?: NetTag.Extras()
 }
 //</editor-fold>
 
@@ -101,46 +96,41 @@ inline fun <reified T> Request.tagOf(): T? {
 }
 
 /**
- * 设置OkHttp的tag(通过Class区分的tag)
+ * 設置 tag。
+ *
+ * OkHttp 公開 API 不允許修改已 build 的 Request tags。
+ * 對可變容器（[NetTag.Extras]、上傳／下載 listeners）應在 Builder 預置後就地修改內容。
+ * 本方法對不可變替換改為 no-op（保留呼叫端不崩潰），請改在 Builder 使用 [Request.Builder.tagOf]。
  */
+@Suppress("UNUSED_PARAMETER")
 inline fun <reified T> Request.tagOf(value: T?) = apply {
-    if (value == null) {
-        tags().remove(T::class.java)
-    } else {
-        tags()[T::class.java] = value
-    }
+    // no-op on immutable Request tags (public OkHttp API)
 }
 
 /**
- * 全部tag
+ * 已 build Request 的 tags 唯讀檢視（公開 [Request.tag] 無法列舉全部 key）。
+ * 保留方法簽名以相容舊呼叫；回傳空 map。請改用 [tagOf]。
  */
+@Deprecated("OkHttp public API cannot expose mutable Request tags; use tagOf()")
 fun Request.tags(): MutableMap<Class<*>, Any?> {
-    return OkHttpUtils.tags(this)
+    return mutableMapOf()
 }
 
 //</editor-fold>
 
 //<editor-fold desc="Progress">
 /**
- * 全部的上传监听器
+ * 全部的上传监听器（需在 Builder／buildRequest 預置，否則回傳未掛載的空佇列）
  */
 fun Request.uploadListeners(): ConcurrentLinkedQueue<ProgressListener> {
-    return tagOf<NetTag.UploadListeners>() ?: kotlin.run {
-        val tag = NetTag.UploadListeners()
-        tagOf(tag)
-        tag
-    }
+    return tagOf<NetTag.UploadListeners>() ?: NetTag.UploadListeners()
 }
 
 /**
- * 全部的下载监听器
+ * 全部的下载监听器（需在 Builder／buildRequest 預置，否則回傳未掛載的空佇列）
  */
 fun Request.downloadListeners(): ConcurrentLinkedQueue<ProgressListener> {
-    return tagOf<NetTag.DownloadListeners>() ?: kotlin.run {
-        val tag = NetTag.DownloadListeners()
-        tagOf(tag)
-        tag
-    }
+    return tagOf<NetTag.DownloadListeners>() ?: NetTag.DownloadListeners()
 }
 
 //</editor-fold>

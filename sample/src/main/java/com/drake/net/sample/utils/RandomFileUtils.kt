@@ -1,6 +1,5 @@
 package com.drake.net.sample.utils
 
-import okhttp3.internal.closeQuietly
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -39,7 +38,10 @@ object RandomFileUtils {
         } catch (e: IOException) {
             e.printStackTrace()
         } finally {
-            fos?.closeQuietly()
+            try {
+                fos?.close()
+            } catch (_: Exception) {
+            }
         }
         return false
     }

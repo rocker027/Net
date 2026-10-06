@@ -4,7 +4,6 @@ import android.util.Log
 import com.drake.engine.base.app
 import com.drake.net.sample.R
 import com.drake.net.sample.constants.Api
-import okhttp3.internal.closeQuietly
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -60,8 +59,14 @@ class MockDispatcher : Dispatcher() {
         file.createNewFile()
         val sink = file.sink().buffer()
         sink.writeAll(source)
-        sink.closeQuietly()
-        source.closeQuietly()
+        try {
+            sink.close()
+        } catch (_: Exception) {
+        }
+        try {
+            source.close()
+        } catch (_: Exception) {
+        }
         return MockResponse().setHeader("Content-Type", "text/plain").setBody("Upload success")
     }
 

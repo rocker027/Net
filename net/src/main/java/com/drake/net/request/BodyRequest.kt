@@ -28,6 +28,7 @@ package com.drake.net.request
 
 import android.net.Uri
 import com.drake.net.interfaces.ProgressListener
+import com.drake.net.tag.NetTag
 import com.drake.net.utils.fileName
 import com.drake.net.utils.toRequestBody
 import okhttp3.*
@@ -197,7 +198,18 @@ open class BodyRequest : BaseRequest() {
             }
         }
 
-        return okHttpRequest.method(method.name, body)
+        if (okHttpRequest.tagOf<NetTag.Extras>() == null) {
+            okHttpRequest.tagOf(NetTag.Extras())
+        }
+        if (okHttpRequest.tagOf<NetTag.UploadListeners>() == null) {
+            okHttpRequest.tagOf(NetTag.UploadListeners())
+        }
+        if (okHttpRequest.tagOf<NetTag.DownloadListeners>() == null) {
+            okHttpRequest.tagOf(NetTag.DownloadListeners())
+        }
+        return okHttpRequest
+            .flushNetMeta()
+            .method(method.name, body)
             .url(httpUrl.build())
             .setConverter(converter)
             .build()
