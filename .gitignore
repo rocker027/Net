@@ -9,3 +9,6 @@
 .externalNativeBuild
 .cxx
 /.idea/
+
+# Local git worktrees
+.worktrees/
