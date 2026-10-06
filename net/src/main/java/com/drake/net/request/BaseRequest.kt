@@ -111,6 +111,13 @@ abstract class BaseRequest {
     fun setGroup(group: Any?) {
         okHttpRequest.group = group
     }
+
+    /**
+     * 附加 Session／Endpoint 快照（見 [NetTag.RequestContext]）。
+     */
+    fun setRequestContext(context: NetTag.RequestContext) {
+        okHttpRequest.setRequestContext(context)
+    }
     //</editor-fold>
 
     //<editor-fold desc="URL">

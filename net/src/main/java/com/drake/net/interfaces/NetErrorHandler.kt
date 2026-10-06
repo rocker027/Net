@@ -45,9 +45,11 @@ interface NetErrorHandler {
     fun onError(e: Throwable) {
         if (e is CancellationException || e.cause is CancellationException) return
         val message = when (e) {
+            is NetUnknownHostException,
             is UnknownHostException -> NetConfig.app.getString(R.string.net_host_error)
             is URLParseException -> NetConfig.app.getString(R.string.net_url_error)
             is NetConnectException -> NetConfig.app.getString(R.string.net_connect_error)
+            is NetworkingException -> NetConfig.app.getString(R.string.net_connect_error)
             is NetSocketTimeoutException -> NetConfig.app.getString(
                 R.string.net_connect_timeout_error,
                 e.message

@@ -37,4 +37,8 @@ dependencies {
     compileOnly "com.github.liangjingkanji:BRV:$brv_version"
     compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutine_version"
     compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutine_version"
+
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "com.squareup.okhttp3:okhttp:$okhttp_version"
+    testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutine_version"
 }

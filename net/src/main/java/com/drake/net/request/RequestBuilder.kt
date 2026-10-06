@@ -169,6 +169,16 @@ fun Request.Builder.downloadListeners(): ConcurrentLinkedQueue<ProgressListener>
 
 
 /**
+ * 附加 App 層請求上下文（Session／Endpoint 快照）。
+ * Net 不解釋欄位；攔截器／執行器可讀 [NetTag.RequestContext]。
+ */
+fun Request.Builder.setRequestContext(context: NetTag.RequestContext) = apply {
+    tagOf(context)
+}
+
+fun Request.requestContext(): NetTag.RequestContext? = tagOf()
+
+/**
  * 设置转换器
  */
 fun Request.Builder.setConverter(converter: NetConverter) = apply {

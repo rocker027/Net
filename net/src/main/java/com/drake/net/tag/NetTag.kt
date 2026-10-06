@@ -68,4 +68,15 @@ sealed class NetTag {
     value class DownloadFileDir(val value: String) {
         constructor(fileDir: File) : this(fileDir.absolutePath)
     }
+
+    /**
+     * App 層 Session／環境快照（NET-006）。
+     * 由 SessionApiExecutor 寫入；Net 只傳遞，不解釋業務語意。
+     */
+    data class RequestContext(
+        val sessionVersion: Long? = null,
+        val accountId: String? = null,
+        val endpointId: String? = null,
+        val extras: Map<String, String> = emptyMap(),
+    )
 }

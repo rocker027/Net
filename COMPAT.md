@@ -65,6 +65,15 @@ scopeNetLife {
 
 完整 URL 仍不拼接 Base／Host。
 
-## 並行工作區（已合併）
+## 尚未完成
 
-`fix/structured-concurrency` 已 merge 進 `fix/compat-p0`。
+- OkHttp 5.x 對照矩陣
+- ForceCache 獨立重建（P2）
+- R8／消費端 AAR 真機驗證
+- 打 Tag `3.7.0-compat.1` 並推送（需授權）
+
+## NET-005～007
+
+- `NetErrorKind` 錯誤分類；`SilentNetErrorHandler`；修正 `NetUnknownHostException` Toast 漏網
+- `NetTag.RequestContext`＋`setRequestContext`；`docs/INTEGRATION.md`
+- `:net:testDebugUnitTest`；`.github/workflows/ci.yml`；`docs/RELEASE.md`
