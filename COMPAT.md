@@ -50,10 +50,21 @@ implementation 'com.github.rocker027:Net:3.7.0-compat.1'
 - Builder tags／headers 改 `NetRequestMeta` 側車＋公開 API
 - **ForceCache 停用**（stub；`CacheMode` 不再生效）；標準 `okhttp3.Cache` 仍可用
 - `closeQuietly` 改庫內實作
+- **NET-003**：`async(Dispatchers.IO)`＋`awaitExecute` 綁定 `Call.cancel`
+- **NET-004**：`setBaseUrl()` 請求級 Base；`NetConfig.requestUrlValidator`；拼接契約 `NetUrl.join`（`base + path`）
 
-## 尚未完成
+### 請求級 Base 用法
 
-- NET-004 請求級 Base URL
-- NET-005／006 App 契約與 Session 整合
-- NET-007 CI／自動化測試／R8 消費驗證
-- 兩分支合併與發佈 Tag
+```kotlin
+scopeNetLife {
+    val result = Get<String>("/health") {
+        setBaseUrl("https://api-b.example.com") // 覆蓋本請求，不改全域 Host
+    }.await()
+}
+```
+
+完整 URL 仍不拼接 Base／Host。
+
+## 並行工作區（已合併）
+
+`fix/structured-concurrency` 已 merge 進 `fix/compat-p0`。

@@ -27,6 +27,7 @@
 package com.drake.net.request
 
 import android.net.Uri
+import com.drake.net.NetConfig
 import com.drake.net.interfaces.ProgressListener
 import com.drake.net.tag.NetTag
 import com.drake.net.utils.fileName
@@ -207,10 +208,12 @@ open class BodyRequest : BaseRequest() {
         if (okHttpRequest.tagOf<NetTag.DownloadListeners>() == null) {
             okHttpRequest.tagOf(NetTag.DownloadListeners())
         }
+        val resolved = httpUrl.build()
+        NetConfig.requestUrlValidator?.validate(resolved)
         return okHttpRequest
             .flushNetMeta()
             .method(method.name, body)
-            .url(httpUrl.build())
+            .url(resolved)
             .setConverter(converter)
             .build()
     }

@@ -52,6 +52,19 @@ abstract class BaseRequest {
     /** 请求的Url构造器 */
     open var httpUrl: HttpUrl.Builder = HttpUrl.Builder()
 
+    /**
+     * 請求級 Base URL。
+     * 為 null 時，相對路徑使用設定當下的 [NetConfig.host] 快照。
+     * 完整 URL（含 http/https）不會拼接 Base。
+     */
+    var baseUrl: String? = null
+        private set
+
+    /**
+     * 相對路徑快照；若 [setPath]/[setUrl] 使用了絕對地址則為 null。
+     */
+    private var relativePath: String? = null
+
     /** 当前请求的数据转换器 */
     open var converter: NetConverter = NetConfig.converter
 
@@ -103,11 +116,25 @@ abstract class BaseRequest {
     //<editor-fold desc="URL">
 
     /**
+     * 設定本請求的 Base URL（Endpoint 快照）。
+     * 若已透過相對 [setPath] 設定路徑，會立即以新 Base 重新解析；
+     * 之後再改全域 [NetConfig.host] 不會影響本請求。
+     */
+    fun setBaseUrl(url: String?) {
+        baseUrl = url
+        val path = relativePath
+        if (path != null) {
+            applyRelativePath(path)
+        }
+    }
+
+    /**
      * 设置一个Url字符串, 其参数不会和你初始化时设置的主域名[NetConfig.host]进行拼接
      * 一般情况下我建议使用更为聪明的[setPath]
      */
     open fun setUrl(url: String) {
         try {
+            relativePath = null
             httpUrl = url.toHttpUrl().newBuilder()
         } catch (e: Exception) {
             throw URLParseException(url, e)
@@ -118,6 +145,7 @@ abstract class BaseRequest {
      * 设置Url
      */
     open fun setUrl(url: HttpUrl) {
+        relativePath = null
         httpUrl = url.newBuilder()
     }
 
@@ -130,18 +158,30 @@ abstract class BaseRequest {
 
     /**
      * 解析配置Path, 支持识别query参数和绝对路径
-     * @param path 如果其不包含http/https则会自动拼接[NetConfig.host]
+     * @param path 如果其不包含http/https则会自动拼接本請求 [baseUrl]（若有）或 [NetConfig.host]
+     *
+     * 拼接契約見 [NetUrl.join]（上游相容：字串直接相加）。
+     * 解析時會快照當下的 Base；之後修改全域 Host 不影響已解析的相對路徑，
+     * 除非再次呼叫 [setBaseUrl]／[setPath]。
      */
     fun setPath(path: String?) {
         val url = path?.toHttpUrlOrNull()
         if (url == null) {
-            try {
-                httpUrl = (NetConfig.host + path).toHttpUrl().newBuilder()
-            } catch (e: Throwable) {
-                throw URLParseException(NetConfig.host + path, e)
-            }
+            relativePath = path
+            applyRelativePath(path)
         } else {
+            relativePath = null
             this.httpUrl = url.newBuilder()
+        }
+    }
+
+    private fun applyRelativePath(path: String?) {
+        val host = baseUrl ?: NetConfig.host
+        val joined = NetUrl.join(host, path)
+        try {
+            httpUrl = joined.toHttpUrl().newBuilder()
+        } catch (e: Throwable) {
+            throw URLParseException(joined, e)
         }
     }
 
@@ -457,10 +497,12 @@ abstract class BaseRequest {
         if (okHttpRequest.tagOf<NetTag.DownloadListeners>() == null) {
             okHttpRequest.tagOf(NetTag.DownloadListeners())
         }
+        val resolved = httpUrl.build()
+        NetConfig.requestUrlValidator?.validate(resolved)
         return okHttpRequest
             .flushNetMeta()
             .method(method.name, null)
-            .url(httpUrl.build())
+            .url(resolved)
             .setConverter(converter)
             .build()
     }

@@ -31,6 +31,7 @@ import com.drake.net.convert.NetConverter
 import com.drake.net.interceptor.RequestInterceptor
 import com.drake.net.interfaces.NetDialogFactory
 import com.drake.net.interfaces.NetErrorHandler
+import com.drake.net.interfaces.RequestUrlValidator
 import com.drake.net.okhttp.toNetOkhttp
 import okhttp3.Call
 import okhttp3.OkHttpClient
@@ -84,6 +85,12 @@ object NetConfig {
 
     /** 请求对话框构建工厂 */
     var dialogFactory: NetDialogFactory = NetDialogFactory
+
+    /**
+     * 請求目標 URL 校驗器（可選）。
+     * 在 [com.drake.net.request.BaseRequest.buildRequest] 發送前呼叫；用於限制協定／主機／端口。
+     */
+    var requestUrlValidator: RequestUrlValidator? = null
 
     //<editor-fold desc="初始化">
     /**
