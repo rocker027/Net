@@ -112,6 +112,7 @@ open class AndroidScope(
     }
 
     open fun cancel(cause: CancellationException? = null) {
+        Net.cancelGroup(scopeGroup)
         val job = coroutineContext[Job]
             ?: error("Scope cannot be cancelled because it does not have a job: $this")
         job.cancel(cause)

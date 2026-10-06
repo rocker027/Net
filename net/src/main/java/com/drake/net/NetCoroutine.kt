@@ -47,7 +47,7 @@ inline fun <reified M> CoroutineScope.Get(
     path: String,
     tag: Any? = null,
     noinline block: (UrlRequest.() -> Unit)? = null
-): Deferred<M> = NetDeferred(async(Dispatchers.IO + SupervisorJob()) {
+): Deferred<M> = NetDeferred(async(Dispatchers.IO) {
     coroutineContext.ensureActive()
     UrlRequest().apply {
         setPath(path)
@@ -55,7 +55,7 @@ inline fun <reified M> CoroutineScope.Get(
         setGroup(coroutineContext[CoroutineExceptionHandler])
         tag(tag)
         block?.invoke(this)
-    }.execute()
+    }.awaitExecute()
 })
 
 /**
@@ -69,7 +69,7 @@ inline fun <reified M> CoroutineScope.Post(
     path: String,
     tag: Any? = null,
     noinline block: (BodyRequest.() -> Unit)? = null
-): Deferred<M> = NetDeferred(async(Dispatchers.IO + SupervisorJob()) {
+): Deferred<M> = NetDeferred(async(Dispatchers.IO) {
     coroutineContext.ensureActive()
     BodyRequest().apply {
         setPath(path)
@@ -77,7 +77,7 @@ inline fun <reified M> CoroutineScope.Post(
         setGroup(coroutineContext[CoroutineExceptionHandler])
         tag(tag)
         block?.invoke(this)
-    }.execute()
+    }.awaitExecute()
 })
 
 /**
@@ -91,7 +91,7 @@ inline fun <reified M> CoroutineScope.Head(
     path: String,
     tag: Any? = null,
     noinline block: (UrlRequest.() -> Unit)? = null
-): Deferred<M> = NetDeferred(async(Dispatchers.IO + SupervisorJob()) {
+): Deferred<M> = NetDeferred(async(Dispatchers.IO) {
     coroutineContext.ensureActive()
     UrlRequest().apply {
         setPath(path)
@@ -99,7 +99,7 @@ inline fun <reified M> CoroutineScope.Head(
         setGroup(coroutineContext[CoroutineExceptionHandler])
         tag(tag)
         block?.invoke(this)
-    }.execute()
+    }.awaitExecute()
 })
 
 /**
@@ -113,7 +113,7 @@ inline fun <reified M> CoroutineScope.Options(
     path: String,
     tag: Any? = null,
     noinline block: (UrlRequest.() -> Unit)? = null
-): Deferred<M> = NetDeferred(async(Dispatchers.IO + SupervisorJob()) {
+): Deferred<M> = NetDeferred(async(Dispatchers.IO) {
     coroutineContext.ensureActive()
     UrlRequest().apply {
         setPath(path)
@@ -121,7 +121,7 @@ inline fun <reified M> CoroutineScope.Options(
         setGroup(coroutineContext[CoroutineExceptionHandler])
         tag(tag)
         block?.invoke(this)
-    }.execute()
+    }.awaitExecute()
 })
 
 /**
@@ -135,7 +135,7 @@ inline fun <reified M> CoroutineScope.Trace(
     path: String,
     tag: Any? = null,
     noinline block: (UrlRequest.() -> Unit)? = null
-): Deferred<M> = NetDeferred(async(Dispatchers.IO + SupervisorJob()) {
+): Deferred<M> = NetDeferred(async(Dispatchers.IO) {
     coroutineContext.ensureActive()
     UrlRequest().apply {
         setPath(path)
@@ -143,7 +143,7 @@ inline fun <reified M> CoroutineScope.Trace(
         setGroup(coroutineContext[CoroutineExceptionHandler])
         tag(tag)
         block?.invoke(this)
-    }.execute()
+    }.awaitExecute()
 })
 
 /**
@@ -157,7 +157,7 @@ inline fun <reified M> CoroutineScope.Delete(
     path: String,
     tag: Any? = null,
     noinline block: (BodyRequest.() -> Unit)? = null
-): Deferred<M> = NetDeferred(async(Dispatchers.IO + SupervisorJob()) {
+): Deferred<M> = NetDeferred(async(Dispatchers.IO) {
     coroutineContext.ensureActive()
     BodyRequest().apply {
         setPath(path)
@@ -165,7 +165,7 @@ inline fun <reified M> CoroutineScope.Delete(
         setGroup(coroutineContext[CoroutineExceptionHandler])
         tag(tag)
         block?.invoke(this)
-    }.execute()
+    }.awaitExecute()
 })
 
 /**
@@ -179,7 +179,7 @@ inline fun <reified M> CoroutineScope.Put(
     path: String,
     tag: Any? = null,
     noinline block: (BodyRequest.() -> Unit)? = null
-): Deferred<M> = NetDeferred(async(Dispatchers.IO + SupervisorJob()) {
+): Deferred<M> = NetDeferred(async(Dispatchers.IO) {
     coroutineContext.ensureActive()
     BodyRequest().apply {
         setPath(path)
@@ -187,7 +187,7 @@ inline fun <reified M> CoroutineScope.Put(
         setGroup(coroutineContext[CoroutineExceptionHandler])
         tag(tag)
         block?.invoke(this)
-    }.execute()
+    }.awaitExecute()
 })
 
 /**
@@ -201,7 +201,7 @@ inline fun <reified M> CoroutineScope.Patch(
     path: String,
     tag: Any? = null,
     noinline block: (BodyRequest.() -> Unit)? = null
-): Deferred<M> = NetDeferred(async(Dispatchers.IO + SupervisorJob()) {
+): Deferred<M> = NetDeferred(async(Dispatchers.IO) {
     coroutineContext.ensureActive()
     BodyRequest().apply {
         setPath(path)
@@ -209,7 +209,7 @@ inline fun <reified M> CoroutineScope.Patch(
         setGroup(coroutineContext[CoroutineExceptionHandler])
         tag(tag)
         block?.invoke(this)
-    }.execute()
+    }.awaitExecute()
 }
 )
 // </editor-fold>
