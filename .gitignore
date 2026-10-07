@@ -15,3 +15,6 @@
 
 # Local publish outputs (regenerate with gradle publish tasks)
 /dist/
+
+# Local agent tool state (oh-my-claudecode HUD/session cache)
+.omc/
