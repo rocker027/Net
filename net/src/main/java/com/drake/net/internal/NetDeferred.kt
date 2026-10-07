@@ -27,6 +27,8 @@ package com.drake.net.internal
 import com.drake.net.exception.NetException
 import com.drake.net.exception.URLParseException
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
+import java.lang.reflect.Method
 
 @PublishedApi
 internal class NetDeferred<M>(private val deferred: Deferred<M>) : Deferred<M> by deferred {
@@ -43,5 +45,18 @@ internal class NetDeferred<M>(private val deferred: Deferred<M>) : Deferred<M> b
             }
             throw  e
         }
+    }
+
+    /**
+     * 協程 1.9 起 [Job] 新增抽象方法 `getParent()`。本庫以協程 1.6.1 編譯，`by deferred` 不會產生該方法，
+     * 消費端讀取 `parent` 時會拋 AbstractMethodError，因此以相同 JVM 簽名提供實作並轉呼叫底層 Deferred。
+     * 編譯基線升級到協程 1.9 以上後，需改為 `override val parent`。
+     */
+    val parent: Job?
+        get() = GET_PARENT?.invoke(deferred) as Job?
+
+    private companion object {
+        // 執行環境的協程低於 1.9 時沒有此方法，parent 回傳 null
+        val GET_PARENT: Method? = runCatching { Job::class.java.getMethod("getParent") }.getOrNull()
     }
 }

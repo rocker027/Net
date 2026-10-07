@@ -23,6 +23,13 @@ android {
         freeCompilerArgs = ["-Xinline-classes", "-Xallow-result-return-type"]
     }
 
+    testOptions {
+        // JVM 單元測試會經過 Progress（SystemClock）與 Net.debug（Log），讓 android.jar 樁回傳預設值。
+        // 限制：SystemClock 恆為 0（測不出進度節流）、Looper 主執行緒判斷恆為真、org.json 回傳預設值；
+        // 依賴這些 Android 行為的測試需改用 Robolectric。
+        unitTests.returnDefaultValues = true
+    }
+
     dokkaHtml {
         outputDirectory.set(file("$rootDir/docs/api"))
         suppressInheritedMembers.set(true)
@@ -45,6 +52,7 @@ dependencies {
 
     testImplementation "junit:junit:4.13.2"
     testImplementation "com.squareup.okhttp3:okhttp:$okhttp_version"
+    testImplementation "com.squareup.okhttp3:mockwebserver:$okhttp_version"
     testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutine_version"
 }
 

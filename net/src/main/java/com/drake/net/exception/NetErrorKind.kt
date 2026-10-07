@@ -72,7 +72,13 @@ enum class NetErrorKind {
                     is RequestParamsException -> return HTTP_CLIENT
                     is ServerResponseException -> return HTTP_SERVER
                     is ResponseException -> return BUSINESS
-                    is ConvertException -> return PARSE
+                    // 預設 NetConverter 對非 2xx 也拋 ConvertException，依狀態碼歸類才不會把 HTTP 錯誤當成解析失敗
+                    is ConvertException -> return when (current.response.code) {
+                        in 400..499 -> HTTP_CLIENT
+                        // 與 JSONConvert 一致，500 以上（含非標準碼）都視為伺服器錯誤
+                        in 500..Int.MAX_VALUE -> HTTP_SERVER
+                        else -> PARSE
+                    }
                     is DownloadFileException -> return DOWNLOAD
                     is NoCacheException -> return CACHE
                 }

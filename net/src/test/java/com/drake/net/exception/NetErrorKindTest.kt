@@ -70,6 +70,23 @@ class NetErrorKindTest {
     }
 
     @Test
+    fun classifiesDefaultConverterFailuresByHttpStatus() {
+        // 預設 NetConverter 對非 2xx 一律拋 ConvertException，分類需依狀態碼而非一律 PARSE
+        assertEquals(
+            NetErrorKind.HTTP_CLIENT,
+            NetErrorKind.of(ConvertException(response(404)))
+        )
+        assertEquals(
+            NetErrorKind.HTTP_SERVER,
+            NetErrorKind.of(ConvertException(response(500)))
+        )
+        assertEquals(
+            NetErrorKind.HTTP_SERVER,
+            NetErrorKind.of(ConvertException(response(600)))
+        )
+    }
+
+    @Test
     fun classifiesRouting() {
         assertEquals(NetErrorKind.ROUTING, NetErrorKind.of(URLParseException("bad")))
     }

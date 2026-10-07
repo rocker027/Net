@@ -80,11 +80,14 @@ class NetRequestBody(
             if (!progressListeners.isNullOrEmpty()) {
                 writeByteCount += byteCount
                 val currentElapsedTime = SystemClock.elapsedRealtime()
+                // 監聽器共用同一個 progress：先固定本次狀態，避免第一個監聽器設定 finish 後其餘監聽器收不到完成事件
+                val wasFinished = progress.finish
+                val reachedEnd = writeByteCount == contentLength
                 progressListeners.forEach { progressListener ->
                     progressListener.intervalByteCount += byteCount
                     val currentInterval = currentElapsedTime - progressListener.elapsedTime
-                    if (!progress.finish && (writeByteCount == contentLength || currentInterval >= progressListener.interval)) {
-                        if (writeByteCount == contentLength) {
+                    if (!wasFinished && (reachedEnd || currentInterval >= progressListener.interval)) {
+                        if (reachedEnd) {
                             progress.finish = true
                         }
                         progressListener.onProgress(

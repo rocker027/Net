@@ -29,12 +29,12 @@ import com.drake.net.NetConfig
 import com.drake.net.cache.CacheMode
 import com.drake.net.convert.NetConverter
 import com.drake.net.exception.URLParseException
+import com.drake.net.internal.executeCancellable
 import com.drake.net.interfaces.ProgressListener
 import com.drake.net.okhttp.toNetOkhttp
 import com.drake.net.reflect.typeTokenOf
 import com.drake.net.response.convert
 import com.drake.net.tag.NetTag
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Job
 import okhttp3.*
@@ -44,12 +44,23 @@ import java.io.File
 import java.lang.reflect.Type
 import java.net.URL
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.coroutineContext
 import kotlin.reflect.typeOf
+
+/** 相對路徑尚無可用 Base 時的佔位主機；.invalid 保證無法解析，配合 https 即使誤送也不會送出內容 */
+private const val PENDING_URL_HOST = "net.invalid"
+
+/** 佔位地址只用來累積 query，建立請求前會以實際 Base 重新解析 */
+private const val PENDING_URL_BASE = "https://$PENDING_URL_HOST/"
 
 abstract class BaseRequest {
 
-    /** 请求的Url构造器 */
+    /**
+     * 请求的Url构造器
+     *
+     * 相對路徑尚無可用 Base 時，這裡暫為佔位地址（`https://net.invalid/…`），只有 query 有意義；
+     * [NetConfig.requestInterceptor] 在建立請求前執行，此時讀到的也是佔位地址。
+     * 直接指定新的構造器會取代佔位地址。覆寫 [buildRequest] 的子類必須透過 [resolveUrl] 取得地址。
+     */
     open var httpUrl: HttpUrl.Builder = HttpUrl.Builder()
 
     /**
@@ -64,6 +75,12 @@ abstract class BaseRequest {
      * 相對路徑快照；若 [setPath]/[setUrl] 使用了絕對地址則為 null。
      */
     private var relativePath: String? = null
+
+    /**
+     * 相對路徑尚無可用 Base（全域 [NetConfig.host] 為空或無效，且未設 [baseUrl]）時為 true，
+     * 此時 [httpUrl] 暫為佔位地址，於 [setBaseUrl] 或建立請求時再解析。
+     */
+    private var urlPending = false
 
     /** 当前请求的数据转换器 */
     open var converter: NetConverter = NetConfig.converter
@@ -124,14 +141,13 @@ abstract class BaseRequest {
 
     /**
      * 設定本請求的 Base URL（Endpoint 快照）。
-     * 若已透過相對 [setPath] 設定路徑，會立即以新 Base 重新解析；
-     * 之後再改全域 [NetConfig.host] 不會影響本請求。
+     * 若已透過相對 [setPath] 設定路徑，會立即以新 Base 重新解析，並保留目前已加入的 query 參數；
+     * 之後再改全域 [NetConfig.host] 不會影響本請求。Base 無效時立即拋 [URLParseException]。
      */
     fun setBaseUrl(url: String?) {
         baseUrl = url
-        val path = relativePath
-        if (path != null) {
-            applyRelativePath(path)
+        if (relativePath != null) {
+            resolveRelativePath(keepQuery = true, strict = hasUsableBase())
         }
     }
 
@@ -142,6 +158,7 @@ abstract class BaseRequest {
     open fun setUrl(url: String) {
         try {
             relativePath = null
+            urlPending = false
             httpUrl = url.toHttpUrl().newBuilder()
         } catch (e: Exception) {
             throw URLParseException(url, e)
@@ -153,6 +170,7 @@ abstract class BaseRequest {
      */
     open fun setUrl(url: HttpUrl) {
         relativePath = null
+        urlPending = false
         httpUrl = url.newBuilder()
     }
 
@@ -170,26 +188,54 @@ abstract class BaseRequest {
      * 拼接契約見 [NetUrl.join]（上游相容：字串直接相加）。
      * 解析時會快照當下的 Base；之後修改全域 Host 不影響已解析的相對路徑，
      * 除非再次呼叫 [setBaseUrl]／[setPath]。
+     * 未設 [baseUrl] 且全域 Host 為空或無效時不立即失敗，等 [setBaseUrl] 或建立請求時再解析；
+     * 這種情況下使用的是建立請求當下的全域 Host，而不是本方法呼叫當下的快照。
      */
     fun setPath(path: String?) {
         val url = path?.toHttpUrlOrNull()
         if (url == null) {
             relativePath = path
-            applyRelativePath(path)
+            resolveRelativePath(keepQuery = false, strict = hasUsableBase())
         } else {
             relativePath = null
+            urlPending = false
             this.httpUrl = url.newBuilder()
         }
     }
 
-    private fun applyRelativePath(path: String?) {
-        val host = baseUrl ?: NetConfig.host
-        val joined = NetUrl.join(host, path)
-        try {
-            httpUrl = joined.toHttpUrl().newBuilder()
+    /**
+     * 以 [NetUrl.join] 將相對路徑接到本請求 Base 或全域 Host。
+     * @param keepQuery 保留目前 builder 的 query（含路徑自帶與之後 param 加入的參數）
+     * @param strict 無法解析時立即拋 [URLParseException]；否則暫用佔位地址並標記 [urlPending]
+     */
+    private fun resolveRelativePath(keepQuery: Boolean, strict: Boolean) {
+        val path = relativePath
+        val joined = NetUrl.join(baseUrl ?: NetConfig.host, path)
+        val query = if (keepQuery) httpUrl.build().encodedQuery else null
+        val builder = try {
+            joined.toHttpUrl().newBuilder().also { urlPending = false }
         } catch (e: Throwable) {
-            throw URLParseException(joined, e)
+            if (strict) throw URLParseException(joined, e)
+            // .invalid 頂級域保證無法解析，即使佔位地址意外被送出也不會到達真實主機
+            (PENDING_URL_BASE + path.orEmpty()).toHttpUrlOrNull()?.newBuilder()?.also { urlPending = true }
+                ?: throw URLParseException(joined, e)
         }
+        if (keepQuery) builder.encodedQuery(query)
+        httpUrl = builder
+    }
+
+    /** 有請求級 Base，或全域 Host 是可解析的地址 */
+    private fun hasUsableBase() = baseUrl != null || NetConfig.host.toHttpUrlOrNull() != null
+
+    /**
+     * 取得最終請求地址；相對路徑若仍在等待 Base，於此嚴格解析，失敗拋 [URLParseException]。
+     * 使用者若已直接指定 [httpUrl]（主機不再是佔位主機），以指定值為準。
+     */
+    protected fun resolveUrl(): HttpUrl {
+        val current = httpUrl.build()
+        if (!urlPending || current.host != PENDING_URL_HOST) return current
+        resolveRelativePath(keepQuery = true, strict = true)
+        return httpUrl.build()
     }
 
     /**
@@ -504,7 +550,7 @@ abstract class BaseRequest {
         if (okHttpRequest.tagOf<NetTag.DownloadListeners>() == null) {
             okHttpRequest.tagOf(NetTag.DownloadListeners())
         }
-        val resolved = httpUrl.build()
+        val resolved = resolveUrl()
         NetConfig.requestUrlValidator?.validate(resolved)
         return okHttpRequest
             .flushNetMeta()
@@ -568,7 +614,7 @@ abstract class BaseRequest {
     }
 
     /**
-     * 在协程中执行请求，并将当前 [Job] 取消绑定到 OkHttp [Call.cancel]。
+     * 在协程中执行请求，呼叫端协程取消时立即 [Call.cancel]（涵蓋等待回應與讀取 body）。
      * [com.drake.net.Get] 等异步 API 内部使用本方法。
      */
     @OptIn(ExperimentalStdlibApi::class)
@@ -576,34 +622,16 @@ abstract class BaseRequest {
         NetConfig.requestInterceptor?.interceptor(this)
         setKType<R>()
         val request = buildRequest()
-        val newCall = okHttpClient.newCall(request)
-        val job = coroutineContext[Job]
-        val cancelHandle = job?.invokeOnCompletion { cause ->
-            if (cause is CancellationException) newCall.cancel()
-        }
-        try {
-            return newCall.execute().convert()
-        } finally {
-            cancelHandle?.dispose()
-        }
+        return okHttpClient.newCall(request).executeCancellable { it.convert<R>() }
     }
 
     /**
-     * 在协程中执行请求（Java / Type Token），并将当前 [Job] 取消绑定到 OkHttp [Call.cancel]。
+     * 在协程中执行请求（Java / Type Token），呼叫端协程取消时立即 [Call.cancel]（涵蓋等待回應與讀取 body）。
      */
     suspend fun <R> awaitExecute(type: Type): R {
         NetConfig.requestInterceptor?.interceptor(this)
         val request = buildRequest()
-        val newCall = okHttpClient.newCall(request)
-        val job = coroutineContext[Job]
-        val cancelHandle = job?.invokeOnCompletion { cause ->
-            if (cause is CancellationException) newCall.cancel()
-        }
-        try {
-            return newCall.execute().convert(type)
-        } finally {
-            cancelHandle?.dispose()
-        }
+        return okHttpClient.newCall(request).executeCancellable { it.convert<R>(type) }
     }
     //</editor-fold>
 

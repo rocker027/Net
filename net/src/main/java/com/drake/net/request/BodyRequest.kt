@@ -208,7 +208,7 @@ open class BodyRequest : BaseRequest() {
         if (okHttpRequest.tagOf<NetTag.DownloadListeners>() == null) {
             okHttpRequest.tagOf(NetTag.DownloadListeners())
         }
-        val resolved = httpUrl.build()
+        val resolved = resolveUrl()
         NetConfig.requestUrlValidator?.validate(resolved)
         return okHttpRequest
             .flushNetMeta()
