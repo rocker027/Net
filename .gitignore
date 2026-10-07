@@ -12,3 +12,6 @@
 
 # Local git worktrees
 .worktrees/
+
+# Local publish outputs (regenerate with gradle publish tasks)
+/dist/

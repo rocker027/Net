@@ -1,6 +1,11 @@
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
 apply plugin: 'org.jetbrains.dokka'
+apply plugin: 'maven-publish'
+
+def netPublishGroup = "com.github.rocker027"
+def netPublishArtifact = "Net"
+def netPublishVersion = "3.7.0-compat.1"
 
 android {
     compileSdkVersion 30
@@ -8,7 +13,7 @@ android {
         minSdkVersion 19
         targetSdkVersion 30
         versionCode 1
-        versionName "1.0"
+        versionName netPublishVersion
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
@@ -41,4 +46,35 @@ dependencies {
     testImplementation "junit:junit:4.13.2"
     testImplementation "com.squareup.okhttp3:okhttp:$okhttp_version"
     testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutine_version"
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                groupId = netPublishGroup
+                artifactId = netPublishArtifact
+                version = netPublishVersion
+
+                pom {
+                    name = "Net (compat fork)"
+                    description = "Maintenance fork of liangjingkanji/Net 3.7.0 with OkHttp public API, cancellation, and request-level base URL."
+                    url = "https://github.com/rocker027/Net"
+                    licenses {
+                        license {
+                            name = "MIT License"
+                            url = "https://opensource.org/licenses/MIT"
+                        }
+                    }
+                }
+            }
+        }
+        repositories {
+            maven {
+                name = "LocalDist"
+                url = uri("${rootProject.projectDir}/dist/maven")
+            }
+        }
+    }
 }
