@@ -5,7 +5,7 @@ apply plugin: 'maven-publish'
 
 def netPublishGroup = "com.github.rocker027"
 def netPublishArtifact = "Net"
-def netPublishVersion = "3.7.0-compat.1"
+def netPublishVersion = "3.7.0-compat.2"
 
 android {
     compileSdkVersion 30

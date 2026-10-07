@@ -3,7 +3,7 @@
 ## 座標
 
 ```text
-com.github.rocker027:Net:3.7.0-compat.1
+com.github.rocker027:Net:3.7.0-compat.2
 ```
 
 打 Tag／接 JitPack 前請確認：App **不要**同時依賴 `com.github.liangjingkanji:Net`。
@@ -23,9 +23,9 @@ com.github.rocker027:Net:3.7.0-compat.1
 | 用途 | 路徑 |
 | --- | --- |
 | 原始 AAR | `net/build/outputs/aar/net-release.aar` |
-| 方便拷貝 | `dist/aar/Net-3.7.0-compat.1.aar` |
+| 方便拷貝 | `dist/aar/Net-3.7.0-compat.2.aar`（`dist/` 不入庫，需手動從原始 AAR 複製） |
 | 本地 Maven 倉庫 | `dist/maven/` |
-| mavenLocal | `~/.m2/repository/com/github/rocker027/Net/3.7.0-compat.1/` |
+| mavenLocal | `~/.m2/repository/com/github/rocker027/Net/3.7.0-compat.2/` |
 
 ### 方式 A：mavenLocal（建議）
 
@@ -41,7 +41,7 @@ repositories {
 
 ```gradle
 dependencies {
-    implementation 'com.github.rocker027:Net:3.7.0-compat.1'
+    implementation 'com.github.rocker027:Net:3.7.0-compat.2'
 
     // Net 對下列依賴為 compileOnly，消費端必須自行提供
     implementation 'com.squareup.okhttp3:okhttp:4.10.0'
@@ -67,7 +67,9 @@ repositories {
 
 ```gradle
 dependencies {
-    implementation files('libs/Net-3.7.0-compat.1.aar')
+    implementation files('libs/Net-3.7.0-compat.2.aar')
+    implementation 'androidx.documentfile:documentfile:1.0.1'
+    implementation 'androidx.startup:startup-runtime:1.0.0'
     implementation 'com.squareup.okhttp3:okhttp:4.10.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.1'
@@ -85,7 +87,7 @@ dependencies {
 | Coroutines | 1.6.1 |
 | minSdk | 19 |
 
-OkHttp 5.x：未驗證，不承諾。
+OkHttp 5.3.2／協程 1.10.2：只在消費端 dc-ned-android 以重建的 AAR 跑過 JVM 單元測試（Robolectric）與 R8 靜態檢查，未在真機與 Release 混淆後執行；本 repo 測試基線仍為上表版本，不作正式承諾。
 
 ## AAR 抽查（本機已做）
 
@@ -99,6 +101,7 @@ OkHttp 5.x：未驗證，不承諾。
 - ForceCache／`CacheMode` 強制快取停用（標準 HTTP Cache 仍可用）。
 - `Get`／`Post` 恢復結構化併發；取消會 `Call.cancel()`。
 - `Request.tags()` 可變 map 已廢棄；請用 Builder `tagOf`／預置 listeners。
+- `3.7.0-compat.2`：沒有可用 Base 時，`URLParseException` 改在建立請求時拋出；協程取消會真的中止請求；完整說明見 `COMPAT.md`「3.7.0-compat.2」。
 
 詳見根目錄 `COMPAT.md`、`COMPAT-CANCEL.md`、`docs/INTEGRATION.md`。
 

@@ -26,13 +26,13 @@
 | --- | --- |
 | Group / Artifact | `com.github.rocker027:Net`（JitPack） |
 | 首版 Tag | `3.7.0-compat.1` |
-| 後續 | `3.7.0-compat.2`…；行為穩定後可考慮 `3.8.0` |
+| 後續 | `3.7.0-compat.2`（2026-10-07 本機發布）…；行為穩定後可考慮 `3.8.0` |
 | Package | 暫留 `com.drake.net`（降低 App 遷移成本）；若需強制與上游隔離再另開 rename epic |
 
 Gradle：
 
 ```gradle
-implementation 'com.github.rocker027:Net:3.7.0-compat.1'
+implementation 'com.github.rocker027:Net:3.7.0-compat.2'
 ```
 
 ## 並行工作區
@@ -65,7 +65,7 @@ scopeNetLife {
 
 完整 URL 仍不拼接 Base／Host。
 
-## 2026-10-07 消費端相容修正（未發布；`AISDLC-2026-1007-net-compat-fixes`）
+## 3.7.0-compat.2：消費端相容修正（2026-10-07；`AISDLC-2026-1007-net-compat-fixes`）
 
 dc-ned-android 以 OkHttp 5.3.2、協程 1.10.2 消費 `3.7.0-compat.1` 時發現下列缺陷，已修正並以 RED→GREEN 測試鎖定：
 
@@ -91,7 +91,7 @@ dc-ned-android 以 OkHttp 5.3.2、協程 1.10.2 消費 `3.7.0-compat.1` 時發�
 - OkHttp 5.x 對照矩陣
 - ForceCache 獨立重建（P2）
 - R8／消費端 AAR 真機驗證
-- 打 Tag `3.7.0-compat.1` 並推送（需授權）
+- 打 Tag `3.7.0-compat.1`、`3.7.0-compat.2` 並推送（需授權）
 
 ## NET-005～007
 
