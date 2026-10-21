@@ -187,18 +187,23 @@ open class BodyRequest : BaseRequest() {
         val body = if (body != null) body else {
             val form = formBody.build()
             try {
-                partBody.build()
+                val parts = partBody.build()
+                val combined = MultipartBody.Builder(parts.boundary).setType(mediaType)
+                parts.parts.forEach { combined.addPart(it) }
                 for (i in 0 until form.size) {
                     val name = form.name(i)
                     val value = form.value(i)
-                    partBody.addFormDataPart(name, value)
+                    combined.addFormDataPart(name, value)
                 }
-                partBody.setType(mediaType).build()
+                combined.build()
             } catch (e: IllegalStateException) {
                 form
             }
         }
 
+        val resolved = resolveUrl()
+        NetConfig.requestUrlValidator?.validate(resolved)
+        okHttpRequest.url(resolved)
         if (okHttpRequest.tagOf<NetTag.Extras>() == null) {
             okHttpRequest.tagOf(NetTag.Extras())
         }
@@ -208,12 +213,9 @@ open class BodyRequest : BaseRequest() {
         if (okHttpRequest.tagOf<NetTag.DownloadListeners>() == null) {
             okHttpRequest.tagOf(NetTag.DownloadListeners())
         }
-        val resolved = resolveUrl()
-        NetConfig.requestUrlValidator?.validate(resolved)
         return okHttpRequest
             .flushNetMeta()
             .method(method.name, body)
-            .url(resolved)
             .setConverter(converter)
             .build()
     }

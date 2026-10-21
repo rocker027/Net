@@ -20,6 +20,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.Response
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -33,7 +35,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
+import java.io.IOException
 
 /**
  * 協程取消必須取消進行中的 OkHttp Call（spec AISDLC-2026-1006-net-compat-fork 第 4 條）。
@@ -171,6 +177,55 @@ class CancellationTest {
 
         assertEquals("fast", body)
         assertFalse(inFlight.await().isCanceled())
+    }
+
+    @Test
+    fun callbackCancellationReportsIOExceptionWithoutEscapingDispatcher() {
+        val failure = AtomicReference<IOException>()
+        val escaped = AtomicReference<Throwable>()
+        val callbackCount = AtomicInteger()
+        val callbackFinished = CountDownLatch(1)
+        val workerFinished = CountDownLatch(1)
+        val executor = Executors.newSingleThreadExecutor { task ->
+            Thread {
+                try {
+                    task.run()
+                } catch (error: Throwable) {
+                    escaped.set(error)
+                } finally {
+                    workerFinished.countDown()
+                }
+            }
+        }
+        try {
+            val call = Net.get(server.url("/slow").toString()) {
+                setClient { dispatcher(okhttp3.Dispatcher(executor)) }
+            }.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    failure.set(e)
+                    callbackCount.incrementAndGet()
+                    callbackFinished.countDown()
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    response.close()
+                    callbackCount.incrementAndGet()
+                    callbackFinished.countDown()
+                }
+            })
+            assertTrue(server.takeRequest(5, TimeUnit.SECONDS) != null)
+
+            call.cancel()
+
+            assertTrue(callbackFinished.await(5, TimeUnit.SECONDS))
+            executor.shutdown()
+            assertTrue(workerFinished.await(5, TimeUnit.SECONDS))
+            assertEquals(1, callbackCount.get())
+            assertTrue("failure=${failure.get()}", failure.get() != null)
+            assertNull("exception escaped OkHttp dispatcher", escaped.get())
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     private fun serveSlowBody() {

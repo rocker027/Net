@@ -41,6 +41,7 @@ import kotlinx.coroutines.CancellationException
 import okhttp3.CacheControl
 import okhttp3.Interceptor
 import okhttp3.Response
+import java.io.IOException
 import java.lang.ref.WeakReference
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -95,7 +96,8 @@ object NetOkHttpInterceptor : Interceptor {
             response = response.newBuilder().body(respBody).build()
             return response
         } catch (e: CancellationException) {
-            throw e
+            // OkHttp 的 callback 邊界只接受 IOException；協程取消由 executeCancellable 轉換。
+            throw IOException(e.message, e)
         } catch (e: SocketTimeoutException) {
             throw NetSocketTimeoutException(request, e.message, e)
         } catch (e: ConnectException) {
@@ -106,7 +108,7 @@ object NetOkHttpInterceptor : Interceptor {
             throw e
         } catch (e: Throwable) {
             if (chain.call().isCanceled() || e.message.equals("Canceled", ignoreCase = true)) {
-                throw CancellationException(e.message, e)
+                throw if (e is IOException) e else IOException(e.message, e)
             }
             throw HttpFailureException(request, cause = e)
         } finally {

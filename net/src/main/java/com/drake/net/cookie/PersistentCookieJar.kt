@@ -63,6 +63,21 @@ class PersistentCookieJar(
                     put("name", cookie.name)
                     put("cookie", cookie.toString())
                 })
+            } else {
+                val storedValue = db.rawQuery(
+                    "SELECT cookie FROM cookies WHERE url = ? AND name = ?",
+                    arrayOf(url.host, cookie.name)
+                ).use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                } ?: return@forEach
+                val storedCookie = Cookie.parse(url, storedValue)
+                // 同名但 domain/path 不同的 Cookie 不能被这条过期指令删除。
+                if (storedCookie != null && storedCookie.name == cookie.name &&
+                    storedCookie.domain == cookie.domain && storedCookie.path == cookie.path
+                ) {
+                    // 读取后若有新值写入，保留新值，避免删除另一条响应刚更新的 Cookie。
+                    db.delete("cookies", "url = ? AND name = ? AND cookie = ?", arrayOf(url.host, cookie.name, storedValue))
+                }
             }
         }
     }
@@ -111,7 +126,7 @@ class PersistentCookieJar(
     }
 
     override fun loadForRequest(url: HttpUrl): List<Cookie> {
-        return getAll(url)
+        return getAll(url).filter { it.matches(url) }
     }
 
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {

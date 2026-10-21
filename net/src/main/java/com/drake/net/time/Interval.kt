@@ -28,6 +28,7 @@ package com.drake.net.time
 
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -177,7 +178,7 @@ open class Interval @JvmOverloads constructor(
         if (state != IntervalStatus.STATE_ACTIVE) return
         scope?.cancel()
         state = IntervalStatus.STATE_PAUSE
-        delay = System.currentTimeMillis() - countTime
+        delay = (delay - (SystemClock.uptimeMillis() - countTime)).coerceAtLeast(0)
     }
 
     /**
@@ -263,10 +264,18 @@ open class Interval @JvmOverloads constructor(
     /** 启动轮询器 */
     @OptIn(ObsoleteCoroutinesApi::class)
     private fun launch(delay: Long = unit.toMillis(initialDelay)) {
+        // 首次回调前也要有计时基准；恢复只等待未经过的时间，不计入暂停期间。
+        this.delay = delay
+        countTime = SystemClock.uptimeMillis()
         scope = CoroutineScope(Dispatchers.Main)
         scope?.launch {
-            ticker = ticker(unit.toMillis(period), delay, mode = TickerMode.FIXED_DELAY)
+            ticker = ticker(
+                unit.toMillis(period), delay, context = coroutineContext,
+                mode = TickerMode.FIXED_DELAY
+            )
             for (unit in ticker) {
+                this@Interval.delay = this@Interval.unit.toMillis(period)
+                countTime = SystemClock.uptimeMillis()
                 subscribeList.forEach {
                     it.invoke(this@Interval, count)
                 }
@@ -278,7 +287,6 @@ open class Interval @JvmOverloads constructor(
                     }
                 }
                 if (end != -1L && start > end) count-- else count++
-                countTime = System.currentTimeMillis()
             }
         }
     }

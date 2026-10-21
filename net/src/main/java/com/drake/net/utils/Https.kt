@@ -75,8 +75,8 @@ internal fun prepareKeyManager(bksFile: InputStream?, password: String?): Array<
     return null
 }
 
-internal fun prepareTrustManager(vararg certificates: InputStream?): Array<TrustManager>? {
-    if (certificates.isEmpty()) return null
+internal fun prepareTrustManager(vararg certificates: InputStream?): Array<TrustManager> {
+    require(certificates.isNotEmpty()) { "At least one certificate is required" }
     try {
         val certificateFactory = CertificateFactory.getInstance("X.509")
         // 创建一个默认类型的KeyStore，存储我们信任的证书
@@ -85,14 +85,11 @@ internal fun prepareTrustManager(vararg certificates: InputStream?): Array<Trust
         for ((index, certStream) in certificates.withIndex()) {
             val certificateAlias = (index).toString()
             // 证书工厂根据证书文件的流生成证书 cert
-            val cert = certificateFactory.generateCertificate(certStream)
+            val cert = certificateFactory.generateCertificate(requireNotNull(certStream) {
+                "Certificate at index $index is null"
+            })
             // 将cert作为可信证书放入到keyStore中
             keyStore.setCertificateEntry(certificateAlias, cert)
-            try {
-                certStream?.close()
-            } catch (e: IOException) {
-                Net.debug(e)
-            }
         }
         // 我们创建一个默认类型的TrustManagerFactory
         val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
@@ -100,10 +97,16 @@ internal fun prepareTrustManager(vararg certificates: InputStream?): Array<Trust
         tmf.init(keyStore)
         // 通过tmf获取TrustManager数组，TrustManager也会信任keyStore中的证书
         return tmf.trustManagers
-    } catch (e: Exception) {
-        Net.debug(e)
+    } finally {
+        // 解析失败也必须关闭全部输入，并让原始异常交给调用者，不能退回信任所有证书。
+        certificates.forEach { certStream ->
+            try {
+                certStream?.close()
+            } catch (e: IOException) {
+                Net.debug(e)
+            }
+        }
     }
-    return null
 }
 
 internal fun chooseTrustManager(trustManagers: Array<TrustManager>): X509TrustManager? {

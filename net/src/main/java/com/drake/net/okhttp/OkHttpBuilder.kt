@@ -93,7 +93,7 @@ fun OkHttpClient.Builder.setSSLCertificate(
 }
 
 /**
- * 配置信任所有证书
+ * 配置仅信任指定证书，证书为空或无法解析时抛出异常
  * @param certificates 含有服务端公钥的证书校验服务端证书
  * @param bksFile  客户端使用bks证书校验服务端证书
  * @param password bks证书的密码
@@ -103,7 +103,9 @@ fun OkHttpClient.Builder.setSSLCertificate(
     bksFile: InputStream? = null,
     password: String? = null
 ) = apply {
-    val trustManager = prepareTrustManager(*certificates)?.let { chooseTrustManager(it) }
+    val trustManager = checkNotNull(chooseTrustManager(prepareTrustManager(*certificates))) {
+        "No X509TrustManager available for the provided certificates"
+    }
     setSSLCertificate(trustManager, bksFile, password)
 }
 

@@ -6,6 +6,8 @@
 com.github.rocker027:Net:3.7.0-compat.2
 ```
 
+上述座標目前供本機 Maven 發布使用，尚未發布遠端 Tag。使用目前原始碼修正前，須重新建置並發布本機 AAR；歷史 AAR 不包含後續修改。
+
 打 Tag／接 JitPack 前請確認：App **不要**同時依賴 `com.github.liangjingkanji:Net`。
 
 ## 本機消費端接入（已產出 AAR）
@@ -84,10 +86,10 @@ dependencies {
 | --- | --- |
 | OkHttp | 4.10.0（已驗證） |
 | Kotlin | 1.8.10 |
-| Coroutines | 1.6.1 |
-| minSdk | 19 |
+| Coroutines | 宣告 1.6.1；本輪單元測試解析為 1.6.4（既有 Lifecycle 依賴） |
+| minSdk | 21（目前原始碼基線） |
 
-OkHttp 5.3.2／協程 1.10.2：只在消費端 dc-ned-android 以重建的 AAR 跑過 JVM 單元測試（Robolectric）與 R8 靜態檢查，未在真機與 Release 混淆後執行；本 repo 測試基線仍為上表版本，不作正式承諾。
+OkHttp 5.3.2／協程 1.10.2：只在消費端 dc-ned-android 以重建的 AAR 跑過 JVM 單元測試（Robolectric）與 R8 靜態檢查，未在真機與 Release 混淆後執行；本 repo 的宣告及實際單元測試解析版本見上表，不作其他版本的正式承諾。
 
 ## AAR 抽查（本機已做）
 

@@ -18,6 +18,8 @@ class RefreshTokenInterceptor : Interceptor {
         val response = chain.proceed(request)
         return synchronized(RefreshTokenInterceptor::class.java) {
             if (response.code == 401 && UserConfig.isLogin && !request.url.encodedPath.contains(Api.Token)) {
+                // 重试或刷新失败都不会再交回此响应，先释放连接。
+                response.close()
                 val tokenInfo = Net.get(Api.Token).execute<TokenModel>() // 同步请求token
                 if (tokenInfo.isExpired) {
                     // token过期抛出异常, 由全局错误处理器处理, 在其中可以跳转到登陆界面提示用户重新登陆
@@ -25,7 +27,11 @@ class RefreshTokenInterceptor : Interceptor {
                 } else {
                     UserConfig.token = tokenInfo.token
                 }
-                chain.proceed(request)
+                // Request 不会随 UserConfig 更新，重试必须显式替换认证头。
+                val retryRequest = request.newBuilder()
+                    .header("token", tokenInfo.token)
+                    .build()
+                chain.proceed(retryRequest)
             } else {
                 response
             }

@@ -22,7 +22,12 @@ Net支持在当前线程执行阻塞线程的同步请求
 
     ```kotlin
     thread {
-        val result = Net.post(Api.PATH).toResult<String>().getOrDefault("请求发生错误, 我是默认值")
+        val result = try {
+            Net.post(Api.PATH).toResult<String>()
+        } catch (e: Exception) {
+            // URL／請求參數準備失敗可能在 toResult 的包裝範圍外拋出。
+            Result.failure<String>(e)
+        }.getOrDefault("请求发生错误, 我是默认值")
         tv?.post {
             tv?.text = result  // view要求在主线程更新
         }
@@ -30,7 +35,7 @@ Net支持在当前线程执行阻塞线程的同步请求
     ```
 
 1. `execute`在请求错误时会直接抛出异常
-2. `toResult`不会抛出异常, 可`getOrThrow/exceptionOrNull`等返回异常对象
+2. `toResult` 將請求執行與轉換期間的例外包成 `Result.failure`，可用 `getOrThrow/exceptionOrNull` 取出。URL 解析、請求建立或其他準備階段的例外仍可能直接拋出；若呼叫端要統一處理，需像上例將整個請求建立與 `toResult` 呼叫放入 `try/catch`。
 
 
 

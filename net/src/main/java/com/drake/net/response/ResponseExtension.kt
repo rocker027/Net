@@ -55,17 +55,34 @@ fun Response.fileName(): String {
     request.downloadFileName().takeUnless { it.isNullOrBlank() }?.let { return it }
     val disposition = header("Content-Disposition")
     if (disposition != null) {
-        disposition.substringAfter("filename=", "").takeUnless { it.isBlank() }?.let { return it }
-        disposition.substringAfter("filename*=", "").trimStart(*"UTF-8''".toCharArray())
-            .takeUnless { it.isBlank() }?.let { return it }
+        val parameters = dispositionParameters.findAll(disposition).associate { match ->
+            val name = match.groupValues[1].lowercase()
+            val rawValue = match.groupValues[2].trim()
+            val value = if (rawValue.length >= 2 && rawValue.startsWith('"') && rawValue.endsWith('"')) {
+                rawValue.substring(1, rawValue.length - 1).replace(quotedPair) { it.groupValues[1] }
+            } else rawValue
+            name to value
+        }
+        // filename* 带有字符集与语言前缀，优先于兼容旧客户端的 filename。
+        parameters["filename*"]?.let { value ->
+            val parts = value.split('\'', limit = 3)
+            if (parts.size == 3 && parts[0].isNotBlank()) {
+                try {
+                    decodeFileName(parts[2], parts[0]).takeUnless { it.isBlank() }?.let { return it }
+                } catch (_: Exception) {
+                    // 不支持的字符集或损坏的转义回退到普通文件名。
+                }
+            }
+        }
+        parameters["filename"]?.takeUnless { it.isBlank() }?.let { return it }
     }
 
-    var fileName: String = request.url.pathSegments.last().substringBefore("?")
+    var fileName = request.url.pathSegments.last()
     fileName = if (fileName.isBlank()) "unknown_${System.currentTimeMillis()}" else {
         if (request.downloadFileNameDecode()) {
             try {
-                URLDecoder.decode(fileName, "UTF8")
-            } catch (e: Exception) {
+                decodeFileName(fileName, "UTF-8")
+            } catch (_: Exception) {
                 fileName
             }
         } else fileName
@@ -73,25 +90,43 @@ fun Response.fileName(): String {
     return fileName
 }
 
+private val dispositionParameters = Regex("""(?:^|;)\s*([^=;\s]+)\s*=\s*("(?:\\.|[^"\\])*"|[^;]*)""")
+private val quotedPair = Regex("""\\(.)""")
+
+private fun decodeFileName(value: String, charset: String): String {
+    // 文件名不是表单字段，字面上的 + 不代表空格。
+    return URLDecoder.decode(value.replace("+", "%2B"), charset)
+}
+
+private fun File.requireDownloadChild(directory: File): File {
+    if (canonicalFile.parentFile != directory.canonicalFile) {
+        throw IOException("Download file must remain within its destination directory")
+    }
+    return this
+}
+
+private fun downloadChild(directory: File, name: String): File {
+    // 必须在构造 File 前检查原始名称，避免 File.name 抹去路径部分。
+    if (name.isBlank() || name == "." || name == ".." ||
+        name.contains('/') || name.contains('\\') || name.contains('\u0000')
+    ) {
+        throw IOException("Download filename must be a single filename")
+    }
+    return File(directory, name).requireDownloadChild(directory)
+}
+
 /**
  * 下载到指定文件
  */
 @Throws(DownloadFileException::class)
 fun Response.file(): File? {
-    var dir = request.downloadFileDir() // 下载目录
-    val fileName: String // 下载文件名
-    val dirFile = File(dir)
-    // 判断downloadDir是否为目录
-    var file = if (dirFile.isDirectory) {
-        fileName = fileName()
-        File(dir, fileName)
-    } else {
-        val temp = dir
-        dir = dir.substringBeforeLast(File.separatorChar)
-        fileName = temp.substringAfterLast(File.separatorChar)
-        dirFile
-    }
+    val useTemporaryFile = request.downloadTempFile()
+    var temporaryFile: File? = null
     try {
+        val destination = File(request.downloadFileDir())
+        // 目录参数使用响应文件名；包含文件名的完整路径仍由调用方决定。
+        val directory = destination.takeIf { it.isDirectory }
+        var file = if (directory != null) downloadChild(directory, fileName()) else destination
         if (file.exists()) {
             // MD5校验匹配文件
             if (request.downloadMd5Verify()) {
@@ -114,42 +149,44 @@ fun Response.file(): File? {
                 }
             }
             // 命名冲突添加序列数字的后缀
-            if (request.downloadConflictRename() && file.name == fileName) {
-                val fileExtension = file.extension
+            if (request.downloadConflictRename()) {
+                val fileExtension = file.extension.let { if (it.isEmpty()) "" else ".$it" }
                 val fileNameWithoutExtension = file.nameWithoutExtension
-                fun rename(index: Long): File {
-                    file = File(dir, fileNameWithoutExtension + "_($index)" + fileExtension)
-                    return if (file.exists()) {
-                        rename(index + 1)
-                    } else file
-                }
-                file = rename(1)
+                val parent = file.parentFile
+                var index = 1L
+                do {
+                    file = File(parent, "${fileNameWithoutExtension}_(${index++})$fileExtension")
+                    if (directory != null) file.requireDownloadChild(directory)
+                } while (file.exists())
             }
         }
 
-        // 临时文件
-        if (request.downloadTempFile()) {
-            file = File(dir, file.name + ".downloading")
-        }
+        // 保留冲突处理后的最终路径，临时文件完成后只能移动到这个目标。
+        val finalFile = file
+        val outputFile = if (useTemporaryFile) File(file.parentFile, file.name + ".downloading") else file
+        if (directory != null) outputFile.requireDownloadChild(directory)
+        if (useTemporaryFile) temporaryFile = outputFile
         val source = body?.source() ?: return null
-        if (!file.exists()) file.createNewFile()
-        file.sink().buffer().use {
+        outputFile.sink().buffer().use {
             it.writeAll(source)
-            source.closeQuietly()
         }
         // 下载完毕删除临时文件
-        if (request.downloadTempFile()) {
-            val fileFinal = File(dir, fileName)
-            file.renameTo(fileFinal)
-            return fileFinal
+        if (useTemporaryFile) {
+            if (directory != null) finalFile.requireDownloadChild(directory)
+            if (!outputFile.renameTo(finalFile)) {
+                throw IOException("Unable to move completed download to its destination")
+            }
         }
-        return file
+        return finalFile
     } catch (e: SocketException) {
         // 取消请求需要删除下载临时文件
-        if (request.downloadTempFile()) file.delete()
+        temporaryFile?.delete()
         throw CancellationException(e)
     } catch (e: Exception) {
         throw DownloadFileException(this, cause = e)
+    } finally {
+        // MD5 命中与创建/写入文件失败时，同样必须释放尚未读完的响应体。
+        body?.closeQuietly()
     }
 }
 

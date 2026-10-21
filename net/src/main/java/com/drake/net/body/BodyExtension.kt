@@ -55,9 +55,14 @@ fun RequestBody.peekBytes(byteCount: Long = 1024 * 1024): ByteString {
  */
 fun ResponseBody.peekBytes(byteCount: Long = 1024 * 1024): ByteString {
     val peeked = source().peek()
-    peeked.request(byteCount)
-    val maxSize = if (byteCount < 0) peeked.buffer.size else minOf(byteCount, peeked.buffer.size)
-    return peeked.readByteString(maxSize)
+    return peeked.use {
+        if (byteCount < 0) {
+            it.readByteString()
+        } else {
+            it.request(byteCount)
+            it.readByteString(minOf(byteCount, it.buffer.size))
+        }
+    }
 }
 
 /**

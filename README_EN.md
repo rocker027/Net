@@ -1,6 +1,6 @@
 <p >
-    <a href="https://github.com/liangjingkanji/Net">中文</a>
-    | <a href="https://github.com/liangjingkanji/Net/blob/master/README_EN.md">English</a>
+    <a href="https://github.com/rocker027/Net">中文</a>
+    | <a href="https://github.com/rocker027/Net/blob/master/README_EN.md">English</a>
 </p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/liangjingkanji/Net/master/docs/img/logo.gif" width="300"/>
@@ -16,7 +16,7 @@
 <p align="center"><img src="https://raw.githubusercontent.com/liangjingkanji/Net/master/docs/img/code-preview.png" width="400"/></p>
 
 <p align="center">
-<a href="https://jitpack.io/#liangjingkanji/Net"><img src="https://jitpack.io/v/liangjingkanji/Net.svg"/></a>
+<a href="https://github.com/rocker027/Net"><img src="https://img.shields.io/badge/fork-rocker027%2FNet-blue"/></a>
 <img src="https://img.shields.io/badge/language-kotlin-orange.svg"/>
 <img src="https://img.shields.io/badge/license-MIT-blue"/>
 <a href="https://liangjingkanji.github.io/Net/api/"><img src="https://img.shields.io/badge/api-reference-red"/></a>
@@ -77,36 +77,33 @@ Net is a non-intrusive framework based on [OkHttp](https://github.com/square/okh
 - [x] Quick HTTPS Configuration
 - [x] Cookie Persistence Management
 - [x] Timed/Time-Limited Requests
-- [x] Force Cache Mode/Custom Cache Key/Cache Validity/LRU Cache Algorithm/Cache Any Data
-- [x] Cache-then-Network Request (Preview Mode)
+- [x] Standard HTTP caching with OkHttp Cache; ForceCache / CacheMode is disabled ([details](docs/cache.md))
+- [x] Preview flow (cache-then-network requires standard HTTP caching or an application-owned local store)
 - [x] Built-in Powerful Polling (Timer)
 - [x] Monitor Upload/Download Progress (Time Used, Speed per Second, Time Remaining...)
 
 <br>
 
+This repository is the `rocker027/Net` compatibility fork. The upstream documentation and demo links above describe the original project; use [COMPAT.md](COMPAT.md) and this checkout’s [docs](docs/) for fork behavior.
+
 ## Installation
 
-Add repository to Project's settings.gradle
+This fork requires Android 5.0 (API 21) or later. The declared dependencies are OkHttp 4.10.0 and Coroutines 1.6.1; local unit tests resolve Coroutines to 1.6.4 through the existing Lifecycle dependency. The `3.7.0-compat.2` coordinates below are for a **local Maven publication**; they do not imply that this tag or a JitPack release is available remotely. Rebuild and publish this checkout locally to consume its current fixes:
 
-```kotlin
-dependencyResolutionManagement {
-    repositories {
-        // ...
-        maven { url 'https://jitpack.io' }
-    }
-}
+```bash
+./gradlew :net:assembleRelease :net:publishReleasePublicationToMavenLocal
 ```
 
-Add framework dependency to Module's build.gradle
+Add `mavenLocal()` to the consumer project's repositories, then use:
 
 ```groovy
-implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0" // Coroutines (version optional)
-implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.0'
-implementation 'com.squareup.okhttp3:okhttp:4.11.0' // Requires OkHttp4+
-implementation 'com.github.liangjingkanji:Net:3.7.0'
+implementation 'com.github.rocker027:Net:3.7.0-compat.2'
+implementation 'com.squareup.okhttp3:okhttp:4.10.0'
+implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1'
+implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.1'
 ```
-For development on Android 5 (API level 21) and below, please use [Net-okhttp3](https://github.com/liangjingkanji/Net-okhttp3)
-<br>
+
+Do not also include `com.github.liangjingkanji:Net`: both artifacts use the `com.drake.net` package. See [release and local AAR instructions](docs/RELEASE.md) for repository setup, optional BRV integration, and direct AAR dependencies. API 19–20 are outside this fork's support baseline; [Net-okhttp3](https://github.com/liangjingkanji/Net-okhttp3) is a separate upstream project.
 
 ## Contribute
 

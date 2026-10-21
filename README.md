@@ -1,6 +1,6 @@
 <p >
-    <a href="https://github.com/liangjingkanji/Net">中文</a>
-    | <a href="https://github.com/liangjingkanji/Net/blob/master/README_EN.md">English</a>
+    <a href="https://github.com/rocker027/Net">中文</a>
+    | <a href="https://github.com/rocker027/Net/blob/master/README_EN.md">English</a>
 </p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/liangjingkanji/Net/master/docs/img/logo.gif" width="300"/>
@@ -16,7 +16,7 @@
 <p align="center"><img src="https://raw.githubusercontent.com/liangjingkanji/Net/master/docs/img/code-preview.png" width="400"/></p>
 
 <p align="center">
-<a href="https://jitpack.io/#liangjingkanji/Net"><img src="https://jitpack.io/v/liangjingkanji/Net.svg"/></a>
+<a href="https://github.com/rocker027/Net"><img src="https://img.shields.io/badge/fork-rocker027%2FNet-blue"/></a>
 <img src="https://img.shields.io/badge/language-kotlin-orange.svg"/>
 <img src="https://img.shields.io/badge/license-MIT-blue"/>
 <a href="https://liangjingkanji.github.io/Net/api/"><img src="https://img.shields.io/badge/api-%E5%87%BD%E6%95%B0%E6%96%87%E6%A1%A3-red"/></a>
@@ -77,36 +77,33 @@ Net是基于[OkHttp](https://github.com/square/okhttp)/协程的非侵入式框�
 - [x] Https快速配置
 - [x] Cookie持久化管理
 - [x] 定时/限时请求
-- [x] 强制缓存模式/自定义缓存Key/缓存有效期/LRU缓存算法/缓存任何数据
-- [x] 先缓存后网络请求(预览模式)
+- [x] 標準 HTTP 快取（OkHttp Cache）；ForceCache／CacheMode 強制快取已停用，見[快取說明](docs/cache.md)
+- [x] 預覽流程（先快取後網路須搭配標準 HTTP 快取或自行讀取本機資料）
 - [x] 内置超强轮询器(计时器)
 - [x] 监听上传/下载进度(使用时间, 每秒速度, 剩余时间...)
 
 <br>
 
+本倉庫是 `rocker027/Net` 相容性 fork。上方上游文件與示範連結描述原專案；本 fork 的行為以 [COMPAT.md](COMPAT.md) 與本倉庫 [docs](docs/) 為準。
+
 ## 安装
 
-Project 的 settings.gradle 添加仓库
+本 fork 最低支援 Android 5.0（API 21），宣告依賴為 OkHttp 4.10.0、Coroutines 1.6.1；本機單元測試的 Coroutines 因既有 Lifecycle 依賴解析為 1.6.4。以下 `3.7.0-compat.2` 座標供**本機 Maven 發布**使用，不表示遠端已有對應 Tag 或 JitPack 成品。若要使用目前 checkout 的修正，請先重新建置並發布至本機：
 
-```kotlin
-dependencyResolutionManagement {
-    repositories {
-        // ...
-        maven { url 'https://jitpack.io' }
-    }
-}
+```bash
+./gradlew :net:assembleRelease :net:publishReleasePublicationToMavenLocal
 ```
 
-Module 的 build.gradle 添加依赖框架
+消費端專案的 repositories 加入 `mavenLocal()`，再加入：
 
 ```groovy
-implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0" // 协程(版本自定)
-implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.0'
-implementation 'com.squareup.okhttp3:okhttp:4.11.0' // 要求OkHttp4以上
-implementation 'com.github.liangjingkanji:Net:3.7.0'
+implementation 'com.github.rocker027:Net:3.7.0-compat.2'
+implementation 'com.squareup.okhttp3:okhttp:4.10.0'
+implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1'
+implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.1'
 ```
-如果在 Android 5 (API level 21)以下开发, 请使用 [Net-okhttp3](https://github.com/liangjingkanji/Net-okhttp3)
-<br>
+
+請勿同時引入 `com.github.liangjingkanji:Net`，兩者沿用相同的 `com.drake.net` package。倉庫設定、BRV 選用整合與直接使用 AAR 的依賴請見[發布及本機接入說明](docs/RELEASE.md)。API 19–20 不在本 fork 的支援範圍；[Net-okhttp3](https://github.com/liangjingkanji/Net-okhttp3) 是另一個上游專案。
 
 ## Contribute
 

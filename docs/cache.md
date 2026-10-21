@@ -1,126 +1,48 @@
-### 缓存优势
+# 快取
 
-1. 页面秒开
-2. 减少服务器压力
-3. 无网络可用
+本 fork 支援 OkHttp 的標準 HTTP 快取。**ForceCache 已停用**：`setCacheMode`、`setCacheKey`、`setCacheValidTime` 保留相容 API，但不會啟用舊版強制快取，也不提供任意請求／資料的離線回退。請勿使用這些 API 判斷資料已寫入快取。
 
-### Net缓存特点
+## 設定標準 HTTP 快取
 
-1. 缓存任何请求方式
-2. 缓存任何数据, File/图片/JSON/ProtoBuf等
-3. 限制最大缓存空间
-4. 使用`DiskLruCache`实现, 删除最近最少使用
+未設定 `Cache` 時不會啟用磁碟快取。
 
-## 配置缓存
-
-不配置`Cache`是不会启用缓存的
 ```kotlin
 NetConfig.initialize(Api.HOST, this) {
-    // Net支持Http缓存协议和强制缓存模式
-    // 当超过maxSize最大值会根据最近最少使用算法清除缓存来限制缓存大小
-    cache(Cache(cacheDir, 1024 * 1024 * 128))
+    // OkHttp 依 HTTP 快取規則讀寫，容量上限為 128 MiB。
+    cache(Cache(File(cacheDir, "http_cache"), 128L * 1024 * 1024))
 }
 ```
 
-!!! note "判断响应来自缓存"
-    如果`Response.cacheResponse`不为null的时, 代表Response来自本地缓存
-
-## Http缓存协议
-
-OkHttp默认的Http缓存协议控制, 要求以下条件
-
-- Get请求方式
-- 缓存使用Url为key, 因此Url改变会读不到缓存
-- 响应头控制缓存: [Cache-Control](https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Cache-Control)
-
-<br>
-通过`setCacheControl`可以控制Http缓存协议, 原理是修改请求头
+快取是否可用由請求方法、URL、回應標頭與有效期等 HTTP 規則決定。一般使用可快取的 GET 回應；`setCacheControl` 只設定請求的 `Cache-Control`，不會讓不可快取的回應變成可快取。
 
 ```kotlin
 scopeNetLife {
-    Post<String>(Api.PATH) {
-        setCacheControl(CacheControl.FORCE_CACHE) // 强制使用缓存
-        // setCacheControl(CacheControl.FORCE_NETWORK) // 强制使用网络
-        // setCacheControl(CacheControl.Builder().noStore().noCache().build()) // 禁止缓存
+    val cached = Get<String>(Api.PATH) {
+        setCacheControl(CacheControl.FORCE_CACHE)
     }.await()
 }
 ```
 
-如果无法实现Http标准缓存协议, 或要缓存Get以外的请求方法, 可以使用`强制缓存模式`
+`CacheControl.FORCE_CACHE` 是 OkHttp 的標準 HTTP 行為，與已停用的 Net `CacheMode` 不同。沒有可用快取時會收到 HTTP 504；預設轉換器會將它視為請求失敗。`CacheControl.FORCE_NETWORK` 可要求重新存取網路。
 
-## 强制缓存模式
+!!! note "判斷回應來源"
+    `Response.cacheResponse != null` 表示回應曾使用快取。條件式驗證可能同時有 `cacheResponse` 與 `networkResponse`，不能據此推定完全沒有網路請求。
 
-无论当前请求是否存在Http标准缓存协议, 当设置强制缓存模式时会无视Http缓存协议
+## 預覽（快取後再請求網路）
 
-```kotlin
-scopeNetLife {
-    tv.text =
-        Post<String>(Api.PATH) {
-            setCacheMode(CacheMode.REQUEST_THEN_READ) // 请求网络失败会读取缓存, 请断网测试
-        }.await()
-}
-```
-
-| 强制缓存模式 | 描述 |
-|-|-|
-| READ | 只读取缓存, 读不到`NoCacheException` |
-| WRITE | 只请求网络, 强制写入缓存 |
-| READ_THEN_REQUEST | 先从缓存读取，如果失败再从网络读取, 强制写入缓存 |
-| REQUEST_THEN_READ | 先从网络读取，如果失败再从缓存读取, 强制写入缓存 |
-
-## 自定缓存Key
-
-仅`强制缓存模式`有效, 缓存Key默认是`请求方式+URL`后产生的`sha1值`
-
-如果要缓存区别请求参数, 请自定义缓存key
+`preview` 本身是先執行預覽區塊再執行主區塊的流程，不會自動持久化資料。以下範例僅適用於已設定 `Cache`、伺服器回應可快取的 GET 請求：
 
 ```kotlin
 scopeNetLife {
-    tv.text =
-        Post<String>(Api.PATH) {
-            setCacheMode(CacheMode.REQUEST_THEN_READ) // 请求网络失败会读取缓存, 请断网测试
-            setCacheKey("请求热门信息" + params) // 具体值都行
-        }.await()
-}
-```
-
-## 缓存有效期
-
-1. 仅`强制缓存模式`有效, 标准Http缓存协议遵守协议本身的有效期
-1. 缓存有效期过期只是让缓存无效, 不会立即删除  <br>根据(最近最少使用)原则在缓存空间达到配置值时删除(即使缓存有效期未到)
-
-```kotlin
-scopeNetLife {
-    tv.text =
-        Post<String>(Api.PATH) {
-            setCacheMode(CacheMode.REQUEST_THEN_READ) // 请求网络失败会读取缓存, 请断网测试
-            setCacheValidTime(1, TimeUnit.DAYS) // 缓存仅一天内有效
-        }.await()
-}
-```
-
-## 预览(缓存+网络)
-
-预览又可以理解为回退请求, 一般用于秒开首页或者回退加载数据
-
-```kotlin
-scopeNetLife {
-    // 然后执行这里(网络请求)
     tv.text = Get<String>(Api.PATH) {
-        setCacheMode(CacheMode.WRITE)
+        setCacheControl(CacheControl.FORCE_NETWORK)
     }.await()
-    Log.d("日志", "网络请求")
 }.preview {
-    // 先执行这里(仅读缓存), 任何异常都视为读取缓存失败
+    // 快取不存在或其他錯誤會結束預覽，接著執行主區塊。
     tv.text = Get<String>(Api.PATH) {
-        setCacheMode(CacheMode.READ)
+        setCacheControl(CacheControl.FORCE_CACHE)
     }.await()
-    Log.d("日志", "读取缓存")
 }
 ```
 
-!!! question "预览和加载两次有什么区别?"
-    区别是`preview`可以控制以下行为
-
-    1. `breakError` 读取缓存成功后不再处理请求的错误, 默认false
-    2. `breakLoading` 读取缓存成功后立刻结束加载动画, 默认true
+也可以在 `preview` 中自行讀取資料庫或檔案。`breakError`、`breakLoading` 控制預覽成功後的錯誤／載入狀態處理；它們不提供快取儲存或過期策略。需要自訂 key、任意 HTTP 方法的快取或離線回退時，應由應用程式明確管理資料儲存。

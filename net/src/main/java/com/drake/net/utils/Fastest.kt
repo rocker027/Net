@@ -34,7 +34,7 @@ import java.util.concurrent.CancellationException
 
 /**
  * 该函数将选择[listDeferred]中的Deferred执行[Deferred.await], 然后将返回最快的结果
- * 执行过程中的异常将被忽略, 如果全部抛出异常则将抛出最后一个Deferred的异常
+ * 执行过程中的异常将被忽略, 如果全部失败则抛出最后收到的异常
  *
  * @param group 指定该值将在成功返回结果后取消掉对应uid的网络请求
  * @param listDeferred 一系列并发任务
@@ -43,38 +43,12 @@ import java.util.concurrent.CancellationException
 suspend fun <T> fastest(
     listDeferred: List<Deferred<T>>,
     group: Any? = null
-): T = coroutineScope {
-    val deferred = CompletableDeferred<T>()
-    if (listDeferred.isNullOrEmpty()) {
-        deferred.completeExceptionally(IllegalArgumentException("Fastest is null or empty"))
-    }
-    val mutex = Mutex()
-    listDeferred.forEach {
-        launch(Dispatchers.IO) {
-            try {
-                val result = it.await()
-                mutex.withLock {
-                    Net.cancelGroup(group)
-                    deferred.complete(result)
-                }
-            } catch (e: Exception) {
-                it.cancel()
-                val allFail = listDeferred.all { it.isCancelled }
-                if (allFail) deferred.completeExceptionally(e) else {
-                    if (e !is CancellationException) {
-                        Net.debug(e)
-                    }
-                }
-            }
-        }
-    }
-    deferred.await()
-}
+): T = fastestResult(listDeferred, group) { _, result -> result }
 
 
 /**
  * 该函数将选择[listDeferred]中的Deferred执行[Deferred.await], 然后将返回最快的结果
- * 执行过程中的异常将被忽略, 如果全部抛出异常则将抛出最后一个Deferred的异常
+ * 请求或转换异常将被忽略, 如果全部失败则抛出最后收到的异常
  *
  * @see DeferredTransform 允许监听[Deferred]返回数据回调
  *
@@ -86,33 +60,50 @@ suspend fun <T> fastest(
 suspend fun <T, R> fastest(
     listDeferred: List<DeferredTransform<T, R>>?,
     group: Any? = null
-): R = coroutineScope {
-    val deferred = CompletableDeferred<R>()
-    if (listDeferred.isNullOrEmpty()) {
-        deferred.completeExceptionally(IllegalArgumentException("Fastest is null or empty"))
+): R {
+    val candidates = listDeferred.orEmpty()
+    return fastestResult(candidates.map { it.deferred }, group) { index, result ->
+        candidates[index].block(result)
     }
+}
+
+private suspend fun <T, R> fastestResult(
+    sources: List<Deferred<T>>,
+    group: Any?,
+    transform: (Int, T) -> R
+): R = coroutineScope {
+    require(sources.isNotEmpty()) { "Fastest is null or empty" }
+    val deferred = CompletableDeferred<R>()
     val mutex = Mutex()
-    listDeferred?.forEach {
+    var remaining = sources.size
+    val waiters = sources.mapIndexed { index, source ->
         launch(Dispatchers.IO) {
             try {
-                val result = it.deferred.await()
+                val result = source.await()
                 mutex.withLock {
-                    Net.cancelGroup(group)
                     if (!deferred.isCompleted) {
-                        val transformResult = it.block(result)
+                        val transformResult = transform(index, result)
+                        Net.cancelGroup(group)
                         deferred.complete(transformResult)
                     }
                 }
             } catch (e: Exception) {
-                it.deferred.cancel()
-                val allFail = listDeferred.all { it.deferred.isCancelled }
-                if (allFail) deferred.completeExceptionally(e) else {
-                    if (e !is CancellationException) {
-                        Net.debug(e)
+                // 父层或等待者的取消不能当作候选失败，也不能取消调用者持有的原任务。
+                ensureActive()
+                mutex.withLock {
+                    if (!deferred.isCompleted) {
+                        remaining--
+                        if (remaining == 0) deferred.completeExceptionally(e)
+                        else if (e !is CancellationException) Net.debug(e)
                     }
                 }
             }
         }
     }
-    deferred.await()
+    try {
+        deferred.await()
+    } finally {
+        // coroutineScope 会等待所有子任务；只结束本函数创建的等待者即可立即返回结果。
+        waiters.forEach { it.cancel() }
+    }
 }

@@ -28,7 +28,6 @@ import com.drake.net.component.Progress
 import com.drake.net.interfaces.ProgressListener
 import okhttp3.MediaType
 import okhttp3.RequestBody
-import com.drake.net.okhttp.closeQuietly
 import okio.*
 import java.io.IOException
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -45,6 +44,10 @@ class NetRequestBody(
         return body.contentType()
     }
 
+    override fun isOneShot(): Boolean = body.isOneShot()
+
+    override fun isDuplex(): Boolean = body.isDuplex()
+
     @Throws(IOException::class)
     override fun contentLength(): Long {
         return contentLength
@@ -58,7 +61,9 @@ class NetRequestBody(
         } else {
             val bufferedSink: BufferedSink = sink.toProgress().buffer()
             body.writeTo(bufferedSink)
-            bufferedSink.closeQuietly()
+            // Duplex 可在 writeTo 返回後繼續寫入；一般 body 只沖出緩衝，sink 由 OkHttp 管理。
+            if (isDuplex()) return
+            bufferedSink.flush()
             if (contentLength == -1L) {
                 progressListeners?.forEach { progressListener ->
                     progressListener.onProgress(

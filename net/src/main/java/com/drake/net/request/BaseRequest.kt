@@ -32,6 +32,7 @@ import com.drake.net.exception.URLParseException
 import com.drake.net.internal.executeCancellable
 import com.drake.net.interfaces.ProgressListener
 import com.drake.net.okhttp.toNetOkhttp
+import com.drake.net.okhttp.NetRequestBuilder
 import com.drake.net.reflect.typeTokenOf
 import com.drake.net.response.convert
 import com.drake.net.tag.NetTag
@@ -91,7 +92,7 @@ abstract class BaseRequest {
     //<editor-fold desc="OkHttpClient" >
 
     /** 请求对象构造器 */
-    open var okHttpRequest: Request.Builder = Request.Builder()
+    open var okHttpRequest: Request.Builder = NetRequestBuilder()
 
     /** 请求客户端 */
     open var okHttpClient = NetConfig.okHttpClient
@@ -379,33 +380,33 @@ abstract class BaseRequest {
      * 如果已存在相同`name`的请求头会添加而不会覆盖, 因为请求头本身存在多个值
      */
     fun addHeader(name: String, value: String) {
-        okHttpRequest.headers().add(name, value)
+        okHttpRequest.flushNetMeta().addHeader(name, value)
     }
 
     /**
      * 设置请求头, 会覆盖请求头而不像[addHeader]是添加
      */
     fun setHeader(name: String, value: String) {
-        okHttpRequest.headers().set(name, value)
+        okHttpRequest.flushNetMeta().header(name, value)
     }
 
     /**
      * 删除请求头
      */
     fun removeHeader(name: String) {
-        okHttpRequest.headers().removeAll(name)
+        okHttpRequest.flushNetMeta().removeHeader(name)
     }
 
     /**
      * 批量设置请求头
      */
     fun setHeaders(headers: Headers) {
-        val builder = okHttpRequest.headers()
+        val builder = okHttpRequest.flushNetMeta()
         for (name in headers.names()) {
-            builder.removeAll(name)
+            builder.removeHeader(name)
         }
         for (i in 0 until headers.size) {
-            builder.add(headers.name(i), headers.value(i))
+            builder.addHeader(headers.name(i), headers.value(i))
         }
     }
 
@@ -424,7 +425,7 @@ abstract class BaseRequest {
      * 设置Http缓存协议头的缓存控制
      */
     fun setCacheControl(cacheControl: CacheControl) {
-        okHttpRequest.cacheControl(cacheControl)
+        okHttpRequest.flushNetMeta().cacheControl(cacheControl)
     }
 
     /**
@@ -540,6 +541,9 @@ abstract class BaseRequest {
      * 构建请求对象Request
      */
     open fun buildRequest(): Request {
+        val resolved = resolveUrl()
+        NetConfig.requestUrlValidator?.validate(resolved)
+        okHttpRequest.url(resolved)
         // 預置可變容器，讓進行中請求仍可對同一 queue 加 listener（無需改 Request tag map）
         if (okHttpRequest.tagOf<NetTag.Extras>() == null) {
             okHttpRequest.tagOf(NetTag.Extras())
@@ -550,12 +554,9 @@ abstract class BaseRequest {
         if (okHttpRequest.tagOf<NetTag.DownloadListeners>() == null) {
             okHttpRequest.tagOf(NetTag.DownloadListeners())
         }
-        val resolved = resolveUrl()
-        NetConfig.requestUrlValidator?.validate(resolved)
         return okHttpRequest
             .flushNetMeta()
             .method(method.name, null)
-            .url(resolved)
             .setConverter(converter)
             .build()
     }

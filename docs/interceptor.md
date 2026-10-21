@@ -19,7 +19,7 @@ NetConfig.initialize(Api.HOST, this) {
 }
 ```
 
-客户端token自动续期示例
+以下是使用 `token` 請求標頭的續期範例。它不會自動安裝至 sample；應用程式需依自己的登入協定接入。第一次 401 回應在刷新前關閉，刷新成功後重建 Request，才會送出新 token。此範例只重試原請求一次。
 
 ```kotlin
 class RefreshTokenInterceptor : Interceptor {
@@ -28,6 +28,7 @@ class RefreshTokenInterceptor : Interceptor {
         val response = chain.proceed(request)
         return synchronized(RefreshTokenInterceptor::class.java) {
             if (response.code == 401 && UserConfig.isLogin && !request.url.encodedPath.contains(Api.Token)) {
+                response.close() // 釋放這次不再交回呼叫端的 401 回應
                 val tokenInfo = Net.get(Api.Token).execute<TokenModel>() // 同步请求token
                 if (tokenInfo.isExpired) {
                     // token过期抛出异常, 由全局错误处理器处理, 在其中可以跳转到登陆界面提示用户重新登陆
@@ -35,7 +36,10 @@ class RefreshTokenInterceptor : Interceptor {
                 } else {
                     UserConfig.token = tokenInfo.token
                 }
-                chain.proceed(request)
+                val retryRequest = request.newBuilder()
+                    .header("token", tokenInfo.token)
+                    .build()
+                chain.proceed(retryRequest)
             } else {
                 response
             }

@@ -71,7 +71,8 @@ var Request.Builder.kType: KType?
     }
 
 /**
- * 全部的请求头（Builder 階段側車，build 前會 flush 到公開 Headers API）
+ * 全部的请求头。Net 自有 Builder 與原生 setter 共用狀態。
+ * 外部原生 Builder 的編輯須以 [flushNetMeta] 套用；請先設定 URL 才能取得既有標頭快照。
  */
 fun Request.Builder.headers(): Headers.Builder {
     return NetRequestMeta.headers(this)
@@ -119,21 +120,22 @@ fun Request.Builder.extras(): HashMap<String, Any?> {
  * 读取OkHttp的tag(通过Class区分的tag)
  */
 inline fun <reified T> Request.Builder.tagOf(): T? {
-    return tags()[T::class.java] as? T
+    return readNetTag(T::class.java)
 }
 
 /**
  * 设置OkHttp的tag(通过Class区分的tag)
  */
 inline fun <reified T> Request.Builder.tagOf(value: T?) = apply {
-    val map = tags()
-    if (value == null) {
-        map.remove(T::class.java)
-    } else {
-        map[T::class.java] = value
-    }
-    tag(T::class.java, value)
+    writeNetTag(T::class.java, value)
 }
+
+@PublishedApi
+internal fun <T> Request.Builder.readNetTag(type: Class<T>): T? = NetRequestMeta.tag(this, type)
+
+@PublishedApi
+internal fun <T> Request.Builder.writeNetTag(type: Class<T>, value: T?) =
+    NetRequestMeta.tag(this, type, value)
 
 /**
  * 全部 tag（Builder 側車 map；與公開 [Request.Builder.tag] 同步維護）

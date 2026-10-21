@@ -1,20 +1,21 @@
 # Net fork 相容基線（COMPAT）
 
-- **日期**：2026-10-06
+- **建立日期**：2026-10-06
+- **更新日期**：2026-10-21
 - **上游**：liangjingkanji/Net `3.7.0`（功能提交 `1d4f621`）
 - **本倉庫 HEAD（開工時）**：`0d2ab60`（`rocker027/Net`）
 - **Initiative**：`AISDLC-2026-1006-net-compat-fork`
 
-## 依賴矩陣（本專案現行版本＝首版承諾）
+## 依賴矩陣（目前原始碼基線）
 
 | 元件 | 版本 | 說明 |
 | --- | --- | --- |
 | OkHttp | **4.10.0** | `build.gradle` `okhttp_version`；compileOnly |
-| Coroutines | 1.6.1 | |
+| Coroutines | 1.6.1（宣告） | 本輪單元測試因既有 Lifecycle 依賴解析為 1.6.4 |
 | Kotlin | 1.8.10 | |
 | AGP | 7.1.3 | |
-| compileSdk（net） | 30 | sample 為 33 |
-| minSdk | 19 | |
+| compileSdk | **33** | net 與 sample 一致；符合既有 Lifecycle 2.6.2 等依賴的 AAR metadata 要求 |
+| minSdk | **21** | 對齊 OkHttp 4.10.0 的 Android 5.0 最低要求；API 19–20 不在支援範圍 |
 
 **OkHttp 5.x（含 5.3.2／Issue #266）**：列為對照風險線，首版**不**宣稱支援；修掉 internal API 後再單開矩陣驗證。
 
@@ -29,7 +30,7 @@
 | 後續 | `3.7.0-compat.2`（2026-10-07 本機發布）…；行為穩定後可考慮 `3.8.0` |
 | Package | 暫留 `com.drake.net`（降低 App 遷移成本）；若需強制與上游隔離再另開 rename epic |
 
-Gradle：
+以下座標供本機 Maven 發布使用；目前原始碼修正須重新建置 AAR。尚未發布遠端 Tag，不可直接假設 JitPack 已有對應成品。先依 [docs/RELEASE.md](docs/RELEASE.md) 完成本機發布並設定 `mavenLocal()`：
 
 ```gradle
 implementation 'com.github.rocker027:Net:3.7.0-compat.2'
@@ -52,6 +53,26 @@ implementation 'com.github.rocker027:Net:3.7.0-compat.2'
 - `closeQuietly` 改庫內實作
 - **NET-003**：`async(Dispatchers.IO)`＋`awaitExecute` 綁定 `Call.cancel`
 - **NET-004**：`setBaseUrl()` 請求級 Base；`NetConfig.requestUrlValidator`；拼接契約 `NetUrl.join`（`base + path`）
+
+### Builder 標頭與 tag 互通
+
+`Net.get()`／`Net.post()` 的預設 Builder 讓 `headers()` 與原生標頭 setter 共用狀態，依呼叫順序生效。自行替換 `BaseRequest.okHttpRequest` 為原生 `Request.Builder` 時，仍可正常使用 `BaseRequest.setHeader`／`addHeader`／`removeHeader`。
+
+直接在外部原生 Builder 使用 Net 的 `headers()` 擴充時，取得的是側車快照：先設定 URL 才能讀到既有標頭與 tag；編輯後在 `build()` 前呼叫 `flushNetMeta()`，變更於 flush 時套用。
+
+```kotlin
+import com.drake.net.request.flushNetMeta
+import com.drake.net.request.headers
+import okhttp3.Request
+
+val builder = Request.Builder()
+    .url("https://api.example.com/health")
+    .header("X-Mode", "old")
+builder.headers().set("X-Mode", "new")
+val request = builder.flushNetMeta().build()
+```
+
+側車只比對快照內容，無法辨識未設 URL 時對既有原生標頭的 `removeAll()`，也無法將「設回快照中的同值」視為新修改。若需混用側車與原生 setter，先 flush 側車修改，再呼叫原生 setter，避免把快照當成即時標頭編輯器。
 
 ### 請求級 Base 用法
 
