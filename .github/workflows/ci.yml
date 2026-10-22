@@ -1,31 +1,102 @@
-name: build
+name: CI
 
 on:
   push:
     branches: [master, 'fix/**']
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   net-unit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      # sdkmanager 與 Gradle 7.2 需要不同的 Java 執行環境。
+      - name: Set up Java for Android SDK
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Unit tests
-        run: ./gradlew :net:testDebugUnitTest --stacktrace
+      - name: Install Android SDK packages
+        run: sdkmanager 'platform-tools' 'platforms;android-33' 'build-tools;30.0.3'
+      - name: Set up Java for Gradle
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: gradle
       - name: Forbid OkHttp internal API
         run: |
           set -euo pipefail
-          hits="$(rg -n 'import okhttp3\.internal|class OkHttpUtils|getTags\$okhttp|getHeaders\$okhttp|getCache\$okhttp|addLenient\$okhttp' \
-            --glob '*.kt' --glob '*.java' net/src/main || true)"
-          if [ -n "$hits" ]; then
+          test -d net/src/main
+          if hits="$(git grep -nE 'import okhttp3\.internal|class OkHttpUtils|getTags\$okhttp|getHeaders\$okhttp|getCache\$okhttp|addLenient\$okhttp' \
+            -- ':(glob)net/src/main/**/*.kt' ':(glob)net/src/main/**/*.java')"; then
             echo "$hits"
             echo "Found OkHttp internal API usage in net/src/main"
             exit 1
+          else
+            status=$?
+            # 只有 1 表示沒有命中；工具或讀取錯誤必須讓 CI 失敗。
+            if [ "$status" -ne 1 ]; then
+              exit "$status"
+            fi
           fi
           echo "OK: no OkHttp internal API in production sources"
+      - name: Unit tests
+        run: ./gradlew --no-daemon :net:testDebugUnitTest :sample:testDebugUnitTest --stacktrace
+      - name: Build AAR and sample APK
+        run: ./gradlew --no-daemon :net:assembleRelease :sample:assembleDebug --stacktrace
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: unit-test-reports
+          path: |
+            net/build/reports/tests/
+            net/build/test-results/
+            sample/build/reports/tests/
+            sample/build/test-results/
+          retention-days: 14
+      - name: Upload build outputs
+        uses: actions/upload-artifact@v6
+        with:
+          name: android-builds
+          path: |
+            net/build/outputs/aar/net-release.aar
+            sample/build/outputs/apk/debug/net-sample.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+      - name: Install documentation dependencies
+        run: python -m pip install -r requirements-docs.txt
+      - name: Build documentation
+        run: python -m mkdocs build --clean --site-dir site
+      - name: Upload documentation
+        uses: actions/upload-artifact@v6
+        with:
+          name: documentation
+          path: site
+          if-no-files-found: error
+          retention-days: 14

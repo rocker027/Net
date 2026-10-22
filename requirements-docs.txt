@@ -1,0 +1,4 @@
+# 與 Python 3.12 一起驗證；升級時先執行 mkdocs build。
+mkdocs==1.6.1
+mkdocs-material==9.7.7
+pymdown-extensions==12.3

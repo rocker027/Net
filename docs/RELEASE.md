@@ -114,4 +114,26 @@ OkHttp 5.3.2／協程 1.10.2：只在消費端 dc-ned-android 以重建的 AAR �
 
 ## CI
 
-`.github/workflows/ci.yml`：`:net:testDebugUnitTest`＋禁止重新引入 OkHttp internal 符號。
+`.github/workflows/ci.yml` 在 `master`、`fix/**` 推送、Pull Request 及手動執行時觸發：
+
+- 使用 Ubuntu 24.04；以 JDK 17 安裝 Android SDK 33／Build Tools 30.0.3，再切換 JDK 11 執行既有 Gradle 7.2。不要直接用 JDK 17 執行此版本 Gradle。
+- 檢查禁止使用的 OkHttp internal 符號；掃描錯誤會讓流程失敗。
+- 執行 `:net:testDebugUnitTest` 與 `:sample:testDebugUnitTest`，包含 MVVM／MVI ViewModel 回歸測試。
+- 建置 `:net:assembleRelease` 與 `:sample:assembleDebug`；保留 `android-builds` 與 `unit-test-reports` 產物 14 天。這不會發布 Maven 或更新 `dist/`。
+- 使用 Python 3.12 與 `requirements-docs.txt` 固定的主要套件建置文件，產生可下載的 `documentation` 產物，保留 14 天。間接依賴未全部鎖版；文件既有連結警告仍會顯示，目前未啟用 `--strict`。
+
+本機可用 JDK 11 執行相同的 Gradle 任務；文件使用獨立虛擬環境：
+
+```bash
+python3.12 -m venv /tmp/net-docs-venv
+/tmp/net-docs-venv/bin/python -m pip install -r requirements-docs.txt
+/tmp/net-docs-venv/bin/python -m mkdocs build --clean --site-dir site
+```
+
+### Fork 的 CI 範圍
+
+目前只執行測試、建置與產物上傳，沒有自動發布流程。文件不會部署至 GitHub Pages，也不會建立 Release 或發布 Maven 套件；不需要設定 Pages、部署變數或發布用 secret。
+
+所有 job 的 `GITHUB_TOKEN` 都只有 `contents: read`。舊的 `main.yml` 文件部署流程已移除；日後需要對外發布時，再依這個 fork 的版本與發布位置另行設計。若倉庫的 branch protection／ruleset 綁定舊的 `build` 或 `ci` 名稱，請核對並更新所需檢查。
+
+執行成功後，可在 GitHub Actions 該次執行頁面的 Artifacts 下載 `android-builds`、`unit-test-reports` 與 `documentation`。本機驗證不代表 GitHub runner 已驗證；提交推送後仍需確認 Actions 結果。
