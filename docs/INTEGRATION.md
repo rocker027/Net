@@ -15,6 +15,8 @@ Net fork：建請求、傳輸、轉換、傳播取消、錯誤分類
 
 | 方式 | 說明 |
 | --- | --- |
+| `netGet`／`netPost`／`BaseRequest.await` | main-safe suspend，不觸發自訂 Scope 或 Toast |
+| `netResult`／`netFlow` | 型別化結果／狀態；全域分發須明確選用，見 [整合指南](state-api.md) |
 | `Net.get(path).execute()`／`toResult()` | 同步，無自動 Toast |
 | `scope`／`scopeLife` + `Get`/`Post` | 只 `Net.debug`，不走 `onError` Toast |
 | `NetConfig.errorHandler = SilentNetErrorHandler` | 全域關閉 Toast／缺省頁錯誤提示 |
@@ -55,4 +57,4 @@ val ctx = request.requestContext()
 ## JSON 轉換
 
 沿用專案既有 `kotlinx.serialization` 轉換器（參考 sample `SerializationConverter`）。  
-業務碼失敗請拋 `ResponseException` 並把業務碼放在 `tag`；不要另造巢狀 `Result<ApiResponse<…>>`。
+業務碼失敗請拋 `ResponseException` 並把業務碼放在 `tag`。新 `netResult` 可在應用選定的邊界包成 `NetResult`，不需同時再包 Kotlin Result 與 API envelope。NetFailure 的 httpCode 是 HTTP 狀態碼，不代替 tag 的業務碼。

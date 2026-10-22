@@ -1,9 +1,7 @@
-Net支持在ViewModel中创建网络请求/异步任务
+新接入建議使用 [MVVM／MVI／Compose 指南](state-api.md) 的 suspend、NetResult 與 StateFlow。Repository 負責資料請求，ViewModel 負責畫面狀態；下方保留舊版 LiveData／Scope 的相容用法。
 
-!!! Warning "不推荐"
-    1. 网络请求不一定要写在ViewModel <br>
-    2. 网络请求不要写接口回调
-    3. 可以在Activity中直接返回请求结果
+!!! Note "漸進遷移"
+    既有 `scopeNetLife` 仍可使用；新程式碼可在 `viewModelScope` 呼叫 Repository 的 suspend 方法，再用生命週期感知的方式收集 StateFlow。
 
 
 ## 自动生命周期

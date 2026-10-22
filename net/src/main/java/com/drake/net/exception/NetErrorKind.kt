@@ -25,10 +25,12 @@
 package com.drake.net.exception
 
 import java.net.UnknownHostException
+import java.net.SocketTimeoutException
+import java.io.IOException
 import java.util.concurrent.CancellationException
 
 /**
- * 統一錯誤分類（不新增巢狀 Result 包裝）。
+ * 統一錯誤分類，供例外路徑與 NetResult 共用。
  * Repository／執行器可用本枚舉決定重試、續期或上報，而不依賴 Toast 文案。
  */
 enum class NetErrorKind {
@@ -58,12 +60,14 @@ enum class NetErrorKind {
     companion object {
         @JvmStatic
         fun of(e: Throwable): NetErrorKind {
-            var current: Throwable? = e
-            while (current != null) {
+            // 轉換器可能把取消包成解析例外；取消優先於外層錯誤類型。
+            if (e.causes().any { it is CancellationException }) return CANCELLATION
+            for (current in e.causes()) {
                 when (current) {
                     is CancellationException -> return CANCELLATION
                     is URLParseException -> return ROUTING
-                    is NetSocketTimeoutException -> return TIMEOUT
+                    is NetSocketTimeoutException,
+                    is SocketTimeoutException -> return TIMEOUT
                     is NetUnknownHostException,
                     is UnknownHostException,
                     is NetConnectException,
@@ -81,8 +85,8 @@ enum class NetErrorKind {
                     }
                     is DownloadFileException -> return DOWNLOAD
                     is NoCacheException -> return CACHE
+                    is IOException -> return NETWORK
                 }
-                current = current.cause
             }
             return OTHER
         }

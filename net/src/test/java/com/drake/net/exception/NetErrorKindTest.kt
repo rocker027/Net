@@ -12,6 +12,8 @@ import okhttp3.Response
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.net.UnknownHostException
+import java.net.SocketTimeoutException
+import java.io.IOException
 import java.util.concurrent.CancellationException
 
 class NetErrorKindTest {
@@ -89,5 +91,18 @@ class NetErrorKindTest {
     @Test
     fun classifiesRouting() {
         assertEquals(NetErrorKind.ROUTING, NetErrorKind.of(URLParseException("bad")))
+    }
+
+    @Test
+    fun wrappedCancellationTakesPriorityOverConversionAndHttpErrors() {
+        val cancelled = CancellationException("cancelled")
+        assertEquals(NetErrorKind.CANCELLATION, NetErrorKind.of(ConvertException(response(500), cause = cancelled)))
+        assertEquals(NetErrorKind.CANCELLATION, NetErrorKind.of(IOException("io", RuntimeException(cancelled))))
+    }
+
+    @Test
+    fun classifiesRawTransportExceptionsForRepositoryCalls() {
+        assertEquals(NetErrorKind.TIMEOUT, NetErrorKind.of(SocketTimeoutException()))
+        assertEquals(NetErrorKind.NETWORK, NetErrorKind.of(IOException()))
     }
 }

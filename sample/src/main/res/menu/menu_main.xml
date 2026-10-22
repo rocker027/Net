@@ -2,6 +2,10 @@
 
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
+        android:id="@+id/modern_compose"
+        android:icon="@drawable/ic_view_model"
+        android:title="MVVM / MVI Compose" />
+    <item
         android:id="@+id/simple_request"
         android:icon="@drawable/ic_simple_request"
         android:title="简单请求" />

@@ -7,6 +7,11 @@
     app:startDestination="@id/simple_request">
 
     <fragment
+        android:id="@+id/modern_compose"
+        android:name="com.drake.net.sample.modern.ModernRequestFragment"
+        android:label="MVVM / MVI Compose" />
+
+    <fragment
         android:id="@+id/async_task"
         android:name="com.drake.net.sample.ui.fragment.AsyncTaskFragment"
         android:label="异步任务"

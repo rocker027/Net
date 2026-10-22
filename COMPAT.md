@@ -1,7 +1,7 @@
 # Net fork 相容基線（COMPAT）
 
 - **建立日期**：2026-10-06
-- **更新日期**：2026-10-21
+- **更新日期**：2026-10-22
 - **上游**：liangjingkanji/Net `3.7.0`（功能提交 `1d4f621`）
 - **本倉庫 HEAD（開工時）**：`0d2ab60`（`rocker027/Net`）
 - **Initiative**：`AISDLC-2026-1006-net-compat-fork`
@@ -106,6 +106,14 @@ dc-ned-android 以 OkHttp 5.3.2、協程 1.10.2 消費 `3.7.0-compat.1` 時發�
 - `awaitExecute` 與 `Get` 等是 public inline 函式，消費端需以新 AAR 重新編譯才會帶入取消修正。
 
 **驗證範圍**：本 repo 測試基線仍為 OkHttp 4.10.0、協程 1.6.1（`:net:testDebugUnitTest` 27 項；測試以 `unitTests.returnDefaultValues` 執行，限制見 `net/build.gradle`）。OkHttp 5.3.2、協程 1.10.2 由 dc-ned-android 以重建的 AAR 暫時驗證：相容測試、`.parent` 讀取、Net 作用域內 `withTimeout(300)` 約 306ms 結束、R8 保留全部 Net 的 Release 建置。尚未在真機與 Release 混淆後實際執行。
+
+## MVVM／MVI／Compose API（2026-10-22；目前原始碼）
+
+- 新增 `netGet` 等八種 main-safe suspend 請求及 `BaseRequest.await`，沿用既有 request／converter／取消綁定。
+- 新增 `NetResult`、`NetState`、`netResult`、`netFlow` 與明確選用的錯誤分發器。核心不加 Compose 依賴；sample 提供 Compose 範例。
+- 保留既有 Get／Post／Scope／errorHandler。新 dispatcher 不自動呼叫舊 Toast handler。
+- `NetErrorKind.of` 對任意深度取消優先分類，避免 converter 包裝掩蓋取消；cause 循環會終止。原生 SocketTimeoutException → TIMEOUT，其他原生 IOException → NETWORK。
+- 新 API 需重新建置接入，未更新版本號、dist AAR 或執行發布。行為與遷移見 [state-api](docs/state-api.md)。
 
 ## 尚未完成
 

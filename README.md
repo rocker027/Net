@@ -86,6 +86,18 @@ Net是基于[OkHttp](https://github.com/square/okhttp)/协程的非侵入式框�
 
 本倉庫是 `rocker027/Net` 相容性 fork。上方上游文件與示範連結描述原專案；本 fork 的行為以 [COMPAT.md](COMPAT.md) 與本倉庫 [docs](docs/) 為準。
 
+## MVVM / MVI / Compose
+
+Repository 可直接使用 `netGet<T>()`／`netPost<T>()` 等 suspend API，請求準備、傳輸與轉換在 IO 執行。ViewModel 可選用 `netResult { ... }` 或 `netFlow { ... }`，搭配唯讀 StateFlow 供 Compose 收集。
+
+```kotlin
+val result = netResult { netGet<String>("/profile") }
+// 明確選用：局部處理 → 全域 handler → 未消費的即時錯誤通知
+result.dispatchError { error -> error.httpCode == 404 }
+```
+
+既有 `Get().await()` 與 Scope 保留。新 API 預設無 Toast 副作用，不自動重試。完整 imports、錯誤分發契約與遷移方式見 [MVVM／MVI／Compose 指南](docs/state-api.md)；sample 選單提供可編譯的兩種架構示範。新增 API 需從目前原始碼重新建置，舊 dist AAR 不會自動更新。
+
 ## 安装
 
 本 fork 最低支援 Android 5.0（API 21），宣告依賴為 OkHttp 4.10.0、Coroutines 1.6.1；本機單元測試的 Coroutines 因既有 Lifecycle 依賴解析為 1.6.4。以下 `3.7.0-compat.2` 座標供**本機 Maven 發布**使用，不表示遠端已有對應 Tag 或 JitPack 成品。若要使用目前 checkout 的修正，請先重新建置並發布至本機：

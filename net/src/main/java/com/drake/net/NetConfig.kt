@@ -28,6 +28,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import com.drake.net.cache.ForceCache
 import com.drake.net.convert.NetConverter
+import com.drake.net.error.NetErrorDispatcher
 import com.drake.net.interceptor.RequestInterceptor
 import com.drake.net.interfaces.NetDialogFactory
 import com.drake.net.interfaces.NetErrorHandler
@@ -82,6 +83,13 @@ object NetConfig {
 
     /** 错误处理器 */
     var errorHandler: NetErrorHandler = NetErrorHandler
+
+    /**
+     * 新結果／Flow API 的選用分發器，不自動呼叫舊 errorHandler 或 Toast。
+     * 在應用啟動時設定，再由根畫面訂閱同一實例的 events；替換實例不會搬移既有訂閱。
+     */
+    @Volatile
+    var errorDispatcher: NetErrorDispatcher = NetErrorDispatcher()
 
     /** 请求对话框构建工厂 */
     var dialogFactory: NetDialogFactory = NetDialogFactory

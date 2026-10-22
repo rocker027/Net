@@ -92,6 +92,7 @@ nav:
       - 自动分页加载: auto-pull.md
   - 切换线程: thread.md
   - ViewModel: view-model.md
+  - MVVM / MVI / Compose: state-api.md
   - 异常追踪: track.md
   - 错误处理:
       - 错误处理: error.md

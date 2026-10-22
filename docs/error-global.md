@@ -1,3 +1,7 @@
+# 新結果／Flow API
+
+`netResult`／`netFlow` 的全域處理使用明確選用的 `NetErrorDispatcher`，支援局部消費、全域消費與未消費通知。它與下方舊 Scope 的 `NetConfig.errorHandler` 分開，詳見 [錯誤分發契約](state-api.md#全域錯誤與下發)。
+
 可实现`NetErrorHandler`接口来监听全局错误处理
 
 === "创建"
