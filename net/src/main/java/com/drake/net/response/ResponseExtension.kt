@@ -32,14 +32,12 @@ import com.drake.net.reflect.typeTokenOf
 import com.drake.net.request.*
 import com.drake.net.tag.NetTag
 import com.drake.net.utils.md5
-import com.drake.net.okhttp.closeQuietly
 import okhttp3.Response
 import okio.buffer
 import okio.sink
 import java.io.File
 import java.io.IOException
 import java.lang.reflect.Type
-import java.net.SocketException
 import java.net.URLDecoder
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -115,78 +113,79 @@ private fun downloadChild(directory: File, name: String): File {
     return File(directory, name).requireDownloadChild(directory)
 }
 
+// 同一进程只同步选名与落盘，不在网络读取期间持锁。
+private val downloadFileLock = Any()
+
+private fun availableDownloadFile(original: File, directory: File?, reserve: Boolean): File {
+    val extension = original.extension.let { if (it.isEmpty()) "" else ".$it" }
+    var candidate = original
+    var index = 1L
+    while (true) {
+        if (directory != null) candidate.requireDownloadChild(directory)
+        if (if (reserve) candidate.createNewFile() else !candidate.exists()) return candidate
+        candidate = File(original.parentFile, "${original.nameWithoutExtension}_(${index++})$extension")
+    }
+}
+
 /**
  * 下载到指定文件
  */
 @Throws(DownloadFileException::class)
 fun Response.file(): File? {
-    val useTemporaryFile = request.downloadTempFile()
     var temporaryFile: File? = null
     try {
-        val destination = File(request.downloadFileDir())
-        // 目录参数使用响应文件名；包含文件名的完整路径仍由调用方决定。
-        val directory = destination.takeIf { it.isDirectory }
-        var file = if (directory != null) downloadChild(directory, fileName()) else destination
-        if (file.exists()) {
-            // MD5校验匹配文件
-            if (request.downloadMd5Verify()) {
+        val responseBody = body ?: return null
+        return responseBody.use {
+            val destination = File(request.downloadFileDir())
+            val directory = destination.takeIf { it.isDirectory }
+            val requestedFile = if (directory != null) downloadChild(directory, fileName()) else destination
+            if (requestedFile.exists() && request.downloadMd5Verify()) {
                 val md5Header = header("Content-MD5")
-                if (md5Header != null && file.md5(true) == md5Header) {
-                    val downloadListeners = request.tagOf<NetTag.DownloadListeners>()
-                    if (!downloadListeners.isNullOrEmpty()) {
-                        val fileSize = file.length()
-                        val progress = Progress().apply {
-                            currentByteCount = fileSize
-                            totalByteCount = fileSize
-                            intervalByteCount = fileSize
-                            finish = true
-                        }
-                        downloadListeners.forEach {
-                            it.onProgress(progress)
-                        }
+                if (md5Header != null && requestedFile.md5(true) == md5Header) {
+                    val fileSize = requestedFile.length()
+                    val progress = Progress().apply {
+                        currentByteCount = fileSize
+                        totalByteCount = fileSize
+                        intervalByteCount = fileSize
+                        finish = true
                     }
-                    return file
+                    request.tagOf<NetTag.DownloadListeners>()?.forEach { it.onProgress(progress) }
+                    return@use requestedFile
                 }
             }
-            // 命名冲突添加序列数字的后缀
-            if (request.downloadConflictRename()) {
-                val fileExtension = file.extension.let { if (it.isEmpty()) "" else ".$it" }
-                val fileNameWithoutExtension = file.nameWithoutExtension
-                val parent = file.parentFile
-                var index = 1L
-                do {
-                    file = File(parent, "${fileNameWithoutExtension}_(${index++})$fileExtension")
-                    if (directory != null) file.requireDownloadChild(directory)
-                } while (file.exists())
-            }
-        }
 
-        // 保留冲突处理后的最终路径，临时文件完成后只能移动到这个目标。
-        val finalFile = file
-        val outputFile = if (useTemporaryFile) File(file.parentFile, file.name + ".downloading") else file
-        if (directory != null) outputFile.requireDownloadChild(directory)
-        if (useTemporaryFile) temporaryFile = outputFile
-        val source = body?.source() ?: return null
-        outputFile.sink().buffer().use {
-            it.writeAll(source)
-        }
-        // 下载完毕删除临时文件
-        if (useTemporaryFile) {
-            if (directory != null) finalFile.requireDownloadChild(directory)
-            if (!outputFile.renameTo(finalFile)) {
-                throw IOException("Unable to move completed download to its destination")
+            val useTemporaryFile = request.downloadTempFile()
+            val conflictRename = request.downloadConflictRename()
+            val outputFile = if (useTemporaryFile) {
+                // 每个请求持有独立临时文件，失败只能清除自己的输出。
+                File.createTempFile(".net-", ".downloading", requestedFile.absoluteFile.parentFile)
+                    .also { temporaryFile = it }
+            } else if (conflictRename) {
+                synchronized(downloadFileLock) { availableDownloadFile(requestedFile, directory, reserve = true) }
+            } else requestedFile
+            if (directory != null) outputFile.requireDownloadChild(directory)
+            outputFile.sink().buffer().use { sink -> sink.writeAll(responseBody.source()) }
+            if (!useTemporaryFile) return@use outputFile
+
+            // 传输结束后才选最终名称；避免空占位文件被另一个请求的 MD5 检查误判为命中。
+            synchronized(downloadFileLock) {
+                val finalFile = if (conflictRename) {
+                    availableDownloadFile(requestedFile, directory, reserve = false)
+                } else requestedFile
+                if (directory != null) finalFile.requireDownloadChild(directory)
+                if (!outputFile.renameTo(finalFile)) {
+                    throw IOException("Unable to move completed download to its destination")
+                }
+                finalFile
             }
         }
-        return finalFile
-    } catch (e: SocketException) {
-        // 取消请求需要删除下载临时文件
-        temporaryFile?.delete()
-        throw CancellationException(e)
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Exception) {
+        // SocketException 也可能是普通断线，取消由 Call/Job 的实际状态判断。
         throw DownloadFileException(this, cause = e)
     } finally {
-        // MD5 命中与创建/写入文件失败时，同样必须释放尚未读完的响应体。
-        body?.closeQuietly()
+        temporaryFile?.delete()
     }
 }
 
@@ -198,12 +197,12 @@ fun Response.file(): File? {
 inline fun <reified R> Response.convert(): R {
     try {
         return request.converter().onConvert<R>(typeTokenOf<R>(), this) as R
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: NetException) {
-        throw e
     } catch (e: Throwable) {
-        throw ConvertException(this, message = "An unexpected error occurred in the converter", cause = e)
+        closeOnConversionFailure(e)
+        when (e) {
+            is CancellationException, is NetException -> throw e
+            else -> throw ConvertException(this, message = "An unexpected error occurred in the converter", cause = e)
+        }
     }
 }
 
@@ -217,11 +216,21 @@ inline fun <reified R> Response.convert(): R {
 fun <R> Response.convert(type: Type): R {
     try {
         return request.converter().onConvert<R>(type, this) as R
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: NetException) {
-        throw e
     } catch (e: Throwable) {
-        throw ConvertException(this, message = "An unexpected error occurred in the converter", cause = e)
+        closeOnConversionFailure(e)
+        when (e) {
+            is CancellationException, is NetException -> throw e
+            else -> throw ConvertException(this, message = "An unexpected error occurred in the converter", cause = e)
+        }
+    }
+}
+
+/** 最终转换失败才释放响应，保留转换器内部的 fallback 与成功 Response 的所有权。 */
+@PublishedApi
+internal fun Response.closeOnConversionFailure(failure: Throwable) {
+    try {
+        body?.close()
+    } catch (closeFailure: Throwable) {
+        if (closeFailure !== failure) failure.addSuppressed(closeFailure)
     }
 }

@@ -30,6 +30,7 @@ import okhttp3.MediaType
 import okhttp3.ResponseBody
 import okio.*
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.ConcurrentLinkedQueue
 
 class NetResponseBody(
@@ -38,6 +39,7 @@ class NetResponseBody(
     private val complete: (() -> Unit)? = null
 ) : ResponseBody() {
 
+    private val completed = AtomicBoolean(false)
     private val progress = Progress()
     private val bufferedSource by lazy { body.source().toProgress().buffer() }
     private val contentLength by lazy { body.contentLength() }
@@ -54,8 +56,28 @@ class NetResponseBody(
         return bufferedSource
     }
 
+    private fun completeOnce(failure: Throwable? = null) {
+        if (!completed.compareAndSet(false, true)) return
+        try {
+            complete?.invoke()
+        } catch (completionFailure: Throwable) {
+            if (failure == null) throw completionFailure
+            if (completionFailure !== failure) failure.addSuppressed(completionFailure)
+        }
+    }
+
     private fun Source.toProgress() = object : ForwardingSource(this) {
         private var readByteCount: Long = 0
+
+        override fun close() {
+            try {
+                super.close()
+            } catch (e: Throwable) {
+                completeOnce(e)
+                throw e
+            }
+            completeOnce()
+        }
 
         @Throws(IOException::class)
         override fun read(sink: Buffer, byteCount: Long): Long {
@@ -87,10 +109,10 @@ class NetResponseBody(
                         }
                     }
                 }
-                if (bytesRead == -1L) complete?.invoke()
+                if (bytesRead == -1L) completeOnce()
                 return bytesRead
-            } catch (e: Exception) {
-                complete?.invoke()
+            } catch (e: Throwable) {
+                completeOnce(e)
                 throw e
             }
         }

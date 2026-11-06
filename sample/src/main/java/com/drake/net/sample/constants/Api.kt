@@ -8,6 +8,7 @@ object Api {
     const val HOST = "http://127.0.0.1:8091"
 
     const val TEXT = "/text"
+    const val CACHE = "/cache"
     const val DELAY = "/delay"
     const val UPLOAD = "/upload"
     const val GAME = "/game"

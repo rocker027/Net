@@ -16,9 +16,13 @@ Net支持请求返回的数据类型取决于你的转换器实现
 
 ```kotlin
 scopeNetLife {
-    Get<Response>(Api.PATH).await().headers("响应头名称") // 返回响应头
+    val headers = Get<Response>(Api.PATH).await().use { response ->
+        response.headers("响应头名称") // 返回响应头
+    }
 }
 ```
+
+回傳 `Response` 時，由呼叫者負責關閉回應。即使只讀取標頭，也要使用 `use` 或 `close` 釋放 body 與連線資源。
 
 ??? example "转换器实现非常简单"
     ```kotlin title="NetConverter.kt" linenums="1"
@@ -37,7 +41,7 @@ scopeNetLife {
                 return when {
                     succeed === String::class.java && response.isSuccessful -> response.body?.string() as R
                     succeed === ByteString::class.java && response.isSuccessful -> response.body?.byteString() as R
-                    succeed is GenericArrayType && succeed.genericComponentType === Byte::class.java && response.isSuccessful -> response.body?.bytes() as R
+                    (succeed === ByteArray::class.java || succeed is GenericArrayType && succeed.genericComponentType === Byte::class.java) && response.isSuccessful -> response.body?.bytes() as R
                     succeed === File::class.java && response.isSuccessful -> response.file() as R
                     succeed === Response::class.java -> response as R
                     else -> throw ConvertException(response, "An exception occurred while converting the NetConverter.DEFAULT")

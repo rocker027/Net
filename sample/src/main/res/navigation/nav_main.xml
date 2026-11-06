@@ -60,7 +60,7 @@
     <fragment
         android:id="@+id/read_cache"
         android:name="com.drake.net.sample.ui.fragment.ReadCacheFragment"
-        android:label="预读缓存"
+        android:label="HTTP 缓存回退"
         tools:layout="@layout/fragment_read_cache" />
     <fragment
         android:id="@+id/simple_request"

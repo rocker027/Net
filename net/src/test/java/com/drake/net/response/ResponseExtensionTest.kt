@@ -154,16 +154,15 @@ class ResponseExtensionTest {
     }
 
     @Test
-    fun canonicalTemporaryTargetCannotFollowSymlinkOutsideDownloadDirectory() {
+    fun legacyTemporarySymlinkIsNeverUsedByUniqueTemporaryDownloads() {
         val directory = temporaryFolder.newFolder("downloads")
         val outside = temporaryFolder.newFile("outside.txt").apply { writeText("old content") }
         Files.createSymbolicLink(File(directory, "report.txt.downloading").toPath(), outside.toPath())
         val body = TrackingBody("new content")
 
-        assertThrows(DownloadFileException::class.java) {
-            response(directory, body, fileName = "report.txt", temporary = true).file()
-        }
+        val downloaded = response(directory, body, fileName = "report.txt", temporary = true).file()
 
+        assertEquals("new content", downloaded?.readText())
         assertEquals("old content", outside.readText())
         assertTrue(body.closed)
     }

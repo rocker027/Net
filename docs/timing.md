@@ -23,29 +23,26 @@ scopeDialog {
 
 ## 定时请求
 
-指定请求10次
+每次請求前等待一秒，共執行十次。
 
 ```kotlin
 scopeNetLife {
-    // 每秒请求一次, 总共执行10次
-    repeat(20) {
+    // 每次请求前等待1秒, 共执行10次
+    repeat(10) {
         delay(1000)
-        val data = Get<String>(Api.PATH).await()
-        if(it = 10) {
-            return@repeat
-        }
+        Get<String>(Api.PATH).await()
     }
 }
 ```
 
-每秒无限循环请求, 根据某个条件`break`退出
+持續循環請求，每輪先等待一秒，滿足條件時用 `break` 結束。
 
 ```kotlin
 scopeNetLife {
     while (true) {
-        delay(1.toDuration(DurationUnit.SECONDS))
+        delay(1000)
         val data = Get<Config>(Api.PATH).await()
-        if(data.type = 3) {
+        if (data.type == 3) {
             break
         }
     }

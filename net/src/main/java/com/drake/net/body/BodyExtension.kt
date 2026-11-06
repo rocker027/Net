@@ -38,6 +38,16 @@ fun ResponseBody.toNetResponseBody(
     listeners: ConcurrentLinkedQueue<ProgressListener>? = null, complete: (() -> Unit)? = null
 ) = NetResponseBody(this, listeners, complete)
 
+/** OkHttp 4.10 的 MultipartBody 不会汇总 part 的一次性／双工标记，必须逐层检查。 */
+internal fun RequestBody.canReplay(): Boolean {
+    if (isOneShot() || isDuplex()) return false
+    return when (this) {
+        is MultipartBody -> parts.all { it.body.canReplay() }
+        is NetRequestBody -> canReplayBody()
+        else -> true
+    }
+}
+
 /**
  * 复制一段指定长度的字符串内容
  * @param byteCount 复制的字节长度, 允许超过实际长度, 如果-1则返回完整的字符串内容

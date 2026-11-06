@@ -1,4 +1,4 @@
-所有`scopeXX`作用域内为主线程, 可直接更新视图
+`scopeXX` 預設使用主執行緒，可直接更新 View。指定 `Dispatchers.IO` 後，更新 View 必須切回主執行緒。
 
 !!! question "调度器"
     协程中的调度器实际上为线程池, 通过切换调度器可以切换到不同线程上
@@ -7,7 +7,10 @@
 
 ```kotlin
 scopeNetLife(dispatcher = Dispatchers.IO) {
-    tv.text = Get<String>(Api.PATH).await()
+    val text = Get<String>(Api.PATH).await()
+    withMain {
+        tv.text = text
+    }
 }
 ```
 
@@ -23,7 +26,7 @@ scopeNetLife(dispatcher = Dispatchers.IO) {
     scopeNetLife {
         tv.text = withIO {
             // 假设此处是一个IO读写阻塞任务
-            return "读出结果"
+            "读出结果"
         }
     }
     ```
@@ -31,12 +34,15 @@ scopeNetLife(dispatcher = Dispatchers.IO) {
 === "子线程作用域内切换主线程"
     ```kotlin hl_lines="2"
     scopeNetLife(dispatcher = Dispatchers.IO) {
-        tv.text = withMain {
-            // 假设此处是一个IO读写阻塞任务
-            return "读出结果"
+        // 假设此处已经在IO线程完成读写任务
+        val text = "读出结果"
+        withMain {
+            tv.text = text
         }
     }
     ```
+
+`withMain` 只讓區塊內的工作在主執行緒執行。區塊結束後會回到原本的調度器，所以 View 賦值也要放進區塊內。
 
 | 函数                                                         | 描述                                                        |
 | ------------------------------------------------------------ | ----------------------------------------------------------- |

@@ -46,16 +46,6 @@ open class AndroidScope(
     val dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : CoroutineScope, Closeable {
 
-    init {
-        runMain {
-            lifecycleOwner?.lifecycle?.addObserver(object : LifecycleEventObserver {
-                override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
-                    if (lifeEvent == event) cancel()
-                }
-            })
-        }
-    }
-
     protected var catch: (AndroidScope.(Throwable) -> Unit)? = null
     protected var finally: (AndroidScope.(Throwable?) -> Unit)? = null
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -66,6 +56,17 @@ open class AndroidScope(
 
     override val coroutineContext: CoroutineContext =
         dispatcher + exceptionHandler + SupervisorJob()
+
+    init {
+        // addObserver 会同步补发生命周期事件，取消所需的字段必须先初始化。
+        runMain {
+            lifecycleOwner?.lifecycle?.addObserver(object : LifecycleEventObserver {
+                override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
+                    if (lifeEvent == event) cancel()
+                }
+            })
+        }
+    }
 
 
     open fun launch(block: suspend CoroutineScope.() -> Unit): AndroidScope {

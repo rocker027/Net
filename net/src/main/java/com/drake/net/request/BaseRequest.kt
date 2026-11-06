@@ -512,8 +512,8 @@ abstract class BaseRequest {
     /**
      * 下载是否使用临时文件
      * 避免下载失败后覆盖同名文件或者无法判别是否已下载完整, 仅在下载完整以后才会显示为原有文件名
-     * 临时文件命名规则: 文件名 + .downloading
-     *      下载文件名: install.apk, 临时文件名: install.apk.downloading
+     * 临时文件在目标目录中使用每个请求独立的名称，下载完成后再移动到最终路径
+     * 同一进程内并行下载会协调最终命名；跨进程写入同一目录需由调用方协调。
      */
     fun setDownloadTempFile(enabled: Boolean = true) {
         okHttpRequest.tagOf(NetTag.DownloadTempFile(enabled))

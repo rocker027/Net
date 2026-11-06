@@ -16,7 +16,7 @@
             android:layout_height="match_parent"
             android:textStyle="bold"
             android:gravity="center"
-            android:text="仅请求成功一次后才会存在缓存" />
+            android:text="读取 HTTP 缓存或请求本机示范服务中…" />
 
     </FrameLayout>
 </layout>

@@ -24,6 +24,7 @@
 
 package com.drake.net.interceptor
 
+import com.drake.net.body.canReplay
 import com.drake.net.body.name
 import com.drake.net.body.peekBytes
 import com.drake.net.body.value
@@ -78,6 +79,7 @@ open class LogRecordInterceptor @JvmOverloads constructor(
      */
     protected open fun getRequestLog(request: Request): String? {
         val body = request.body ?: return null
+        if (!body.canReplay()) return "Request body omitted (one-shot or duplex content)"
         val mediaType = body.contentType()
         return when {
             body is MultipartBody -> {

@@ -36,13 +36,15 @@ class MockDispatcher : Dispatcher() {
     override fun dispatch(request: RecordedRequest): MockResponse {
         return when (request.requestUrl?.encodedPath ?: "") {
             Api.TEXT -> getString("Request Success : ${request.method}")
+            Api.CACHE -> getString("HTTP cache sample")
+                .setHeader("Cache-Control", "public, max-age=60")
             Api.DELAY -> getString("Request Success : ${request.method}").setBodyDelay(2, TimeUnit.SECONDS)
             Api.UPLOAD -> uploadFile(request)
             Api.GAME -> getRawResponse(R.raw.game)
             Api.DATA -> getRawResponse(R.raw.data)
             Api.ARRAY -> getRawResponse(R.raw.array)
             Api.USER_INFO -> getRawResponse(R.raw.user)
-            Api.CONFIG -> getRawResponse(R.raw.user)
+            Api.CONFIG -> getRawResponse(R.raw.config)
             Api.TIME -> getString(SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date())).setBodyDelay(1, TimeUnit.SECONDS)
             else -> MockResponse().setResponseCode(404)
         }

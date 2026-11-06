@@ -24,6 +24,7 @@ import com.scwang.smart.refresh.footer.ClassicsFooter
 import com.scwang.smart.refresh.header.MaterialHeader
 import com.scwang.smart.refresh.layout.SmartRefreshLayout
 import okhttp3.Cache
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 class App : Application() {
@@ -38,8 +39,8 @@ class App : Application() {
             readTimeout(30, TimeUnit.SECONDS)
             writeTimeout(30, TimeUnit.SECONDS)
 
-            // 本框架支持Http缓存协议和强制缓存模式
-            cache(Cache(cacheDir, 1024 * 1024 * 128)) // 缓存设置, 当超过maxSize最大值会根据最近最少使用算法清除缓存来限制缓存大小
+            // 使用独立目录保存标准 HTTP 缓存，ForceCache 已停用。
+            cache(Cache(File(cacheDir, "http_cache"), 128L * 1024 * 1024))
 
             // LogCat是否输出异常日志, 异常日志可以快速定位网络请求错误
             setDebug(BuildConfig.DEBUG)

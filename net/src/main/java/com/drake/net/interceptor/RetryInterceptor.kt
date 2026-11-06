@@ -25,6 +25,7 @@
 package com.drake.net.interceptor
 
 import androidx.annotation.IntRange
+import com.drake.net.body.canReplay
 import com.drake.net.okhttp.closeQuietly
 import okhttp3.Interceptor
 import okhttp3.Response
@@ -40,8 +41,9 @@ class RetryInterceptor(@IntRange(from = 1) var retryCount: Int = 3) : Intercepto
     override fun intercept(chain: Interceptor.Chain): Response {
         var retryCount = 0
         val request = chain.request()
+        val canRetry = request.body?.canReplay() != false
         var response = chain.proceed(request)
-        while (!response.isSuccessful && retryCount < this.retryCount) {
+        while (canRetry && !response.isSuccessful && retryCount < this.retryCount) {
             retryCount++
             response.closeQuietly()
             response = chain.proceed(request)

@@ -48,6 +48,8 @@ class NetRequestBody(
 
     override fun isDuplex(): Boolean = body.isDuplex()
 
+    internal fun canReplayBody(): Boolean = body.canReplay()
+
     @Throws(IOException::class)
     override fun contentLength(): Long {
         return contentLength

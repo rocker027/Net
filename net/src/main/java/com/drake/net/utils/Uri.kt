@@ -25,6 +25,7 @@
 package com.drake.net.utils
 
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import androidx.documentfile.provider.DocumentFile
 import com.drake.net.NetConfig
@@ -50,9 +51,8 @@ fun Uri.mediaType(): MediaType? {
  */
 @Throws(FileNotFoundException::class)
 fun Uri.toRequestBody(): RequestBody {
-    val document = DocumentFile.fromSingleUri(NetConfig.app, this)
     val contentResolver = NetConfig.app.contentResolver
-    val contentLength = document?.length() ?: -1L
+    val contentLength = queryContentLength()
     val contentType = mediaType()
     return object : RequestBody() {
         override fun contentType(): MediaType? {
@@ -62,9 +62,22 @@ fun Uri.toRequestBody(): RequestBody {
         override fun contentLength() = contentLength
 
         override fun writeTo(sink: BufferedSink) {
-            contentResolver.openInputStream(this@toRequestBody)?.use {
+            val input = contentResolver.openInputStream(this@toRequestBody)
+                ?: throw FileNotFoundException("Unable to open URI content")
+            input.use {
                 sink.writeAll(it.source())
             }
         }
     }
+}
+
+private fun Uri.queryContentLength(): Long {
+    // DocumentFile.length() 会把未知长度当成 0，必须保留 null 与空文件的区别。
+    return NetConfig.app.contentResolver.query(this, arrayOf(OpenableColumns.SIZE), null, null, null)
+        .use { cursor ->
+            if (cursor == null || !cursor.moveToFirst()) return@use -1L
+            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+            if (sizeIndex < 0 || cursor.isNull(sizeIndex)) -1L
+            else cursor.getLong(sizeIndex).takeIf { it >= 0 } ?: -1L
+        }
 }

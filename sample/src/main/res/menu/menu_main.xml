@@ -68,7 +68,7 @@
     <item
         android:id="@+id/read_cache"
         android:icon="@drawable/ic_read_cache"
-        android:title="强制缓存" />
+        android:title="HTTP 缓存回退" />
     <item
         android:id="@+id/previewCacheFragment"
         android:icon="@drawable/ic_preview_cache"
