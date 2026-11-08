@@ -75,6 +75,10 @@ NetConfig.initialize(Api.HOST, this) {
 | 隐藏       | 作用域内任务结束时隐藏加载框  |
 | 手动取消   | 取消作用域内所有网络请求      |
 
+在 Fragment 呼叫 `scopeDialog` 時，Fragment 的 view 銷毀（例如導航離開）也會取消作用域並關閉加載框，避免 view 銷毀後繼續存取 binding。需要跨 view 重建保留的請求，請改由 ViewModel 發起。
+
+這種取消會讓 `finally` 帶著 `CancellationException` 執行。使用預設的 `Dispatchers.Main` 時，`finally` 在 `onDestroyView` 之後才執行，不可在裡面存取 binding。
+
 
 
 

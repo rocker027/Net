@@ -18,8 +18,8 @@
 ```kotlin
 var scope: CoroutineScope? = null
 
-// distinctUntilChanged 表示过滤掉重复结果
-binding.etInput.debounce().distinctUntilChanged().launchIn(this) {
+// distinctUntilChanged 表示过滤掉重复结果；Fragment 中跟随 view 生命周期
+binding.etInput.debounce().distinctUntilChanged().launchIn(viewLifecycleOwner) {
     scope?.cancel() // 发起新的请求前取消旧的请求, 避免旧数据覆盖新数据
     scope = scopeNetLife { // 保存旧的请求到一个变量中
         tv.text = "请求中"
@@ -27,6 +27,9 @@ binding.etInput.debounce().distinctUntilChanged().launchIn(this) {
     }
 }
 ```
+
+!!! note "收集的生命週期"
+    `launchIn(owner)` 會收集到 owner 銷毀才取消，背景時不暫停。在 Fragment 中請傳 `viewLifecycleOwner`，避免 view 銷毀後仍更新 binding，見 [ViewBinding 與 DataBinding](view-system.md)。
 
 指定参数设置节流阀超时时间
 ```kotlin

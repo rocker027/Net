@@ -30,7 +30,6 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
@@ -40,17 +39,8 @@ import kotlinx.coroutines.launch
 
 /** 从主选单进入；Compose composition 与 Fragment view 生命周期绑定。 */
 class ModernRequestFragment : Fragment() {
-    private val factory = object : ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = when (modelClass) {
-            DemoMvvmViewModel::class.java -> DemoMvvmViewModel(LocalDemoRepository()) as T
-            DemoMviViewModel::class.java -> DemoMviViewModel(LocalDemoRepository()) as T
-            else -> error("Unknown ViewModel: $modelClass")
-        }
-    }
-
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        val provider = ViewModelProvider(this, factory)
+        val provider = ViewModelProvider(this, DemoViewModelFactory)
         val mvvm = provider[DemoMvvmViewModel::class.java]
         val mvi = provider[DemoMviViewModel::class.java]
         return ComposeView(requireContext()).apply {
@@ -113,10 +103,5 @@ private fun RequestDemo(mvvm: DemoMvvmViewModel, mvi: DemoMviViewModel) {
 
 @Composable
 private fun RequestState(state: NetState<String>) {
-    when (state) {
-        NetState.Idle -> Text("等待请求")
-        NetState.Loading -> CircularProgressIndicator()
-        is NetState.Success -> Text("成功：${state.value}")
-        is NetState.Failure -> Text("失败：${state.error.httpCode ?: state.error.kind}")
-    }
+    if (state is NetState.Loading) CircularProgressIndicator() else Text(state.toDisplayText())
 }

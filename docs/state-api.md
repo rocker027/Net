@@ -1,6 +1,6 @@
 # MVVM、MVI 與 Compose
 
-新增的 API 可與既有 `Get().await()`、`scopeNetLife` 並存。Repository 直接回傳 suspend 資料；ViewModel 決定結果、狀態及錯誤處理；Compose 只收集狀態。核心不依賴 Compose，也不要求繼承特定 ViewModel。
+新增的 API 可與既有 `Get().await()`、`scopeNetLife` 並存。Repository 直接回傳 suspend 資料；ViewModel 決定結果、狀態及錯誤處理；Compose 只收集狀態。核心不依賴 Compose，也不要求繼承特定 ViewModel。ViewBinding 與 DataBinding 共用同一個 ViewModel，收集方式見 [ViewBinding 與 DataBinding](view-system.md)。
 
 ```mermaid
 flowchart LR
@@ -82,6 +82,13 @@ val state by viewModel.state.collectAsStateWithLifecycle()
 ```
 
 事件收集使用 `LaunchedEffect` 與 `repeatOnLifecycle(STARTED)`；Fragment 內的 ComposeView 使用 `DisposeOnViewTreeLifecycleDestroyed`。完整接線見 [ModernRequestFragment.kt](../sample/src/main/java/com/drake/net/sample/modern/ModernRequestFragment.kt)。Compose 相關依賴只加入 sample，消費端自行加入 `lifecycle-runtime-compose`。
+
+### Compose 注意事項
+
+- **不要在 composable 主體發請求**：`scopeNetLife`、`scope`、`Get().await()` 等舊入口不可在組合主體內呼叫，重組或設定變更時會重送請求。請求由 ViewModel 方法或點擊事件啟動；畫面只收集狀態。
+- **穩定性**：`NetState`、`NetFailure` 所在模組沒有經過 Compose compiler 編譯，`NetFailure` 又包含 `Throwable`，Compose 會視為不穩定型別。Compose compiler 沒有 strong skipping 時，參數含這些型別的 composable 無法略過重組。Kotlin 2.0.20 以上預設開啟 strong skipping。較舊版本可用 stability configuration file（Compose compiler 1.5.5 以上）宣告 `com.drake.net.result.*`，前提是 `Success` 內的資料本身不可變。可用 Compose compiler 報告確認實際結果。sample 使用 Compose compiler 1.4.3，沒有 strong skipping。
+- **進度**：`ProgressListener` 每次收到獨立快照，可直接寫入 `MutableStateFlow` 後用 `collectAsStateWithLifecycle` 收集，見 [進度監聽](progress.md)。
+- **輪詢器**：`Interval` 在主執行緒回呼。在 composable 內使用時包在 `DisposableEffect` 中，並在 `onDispose` 呼叫 `cancel()`。需要跨設定變更保留的計時，放在 ViewModel 並以 `Interval.life(viewModel)` 綁定。
 
 ## 全域錯誤與下發
 

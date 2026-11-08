@@ -28,6 +28,9 @@ import com.drake.net.component.Progress
 /**
  * 进度监听器, 可能为下载或上传
  *
+ * [onProgress] 在 OkHttp 读写请求体/响应体的线程执行，更新 UI 前请切换到主线程，
+ * 或写入线程安全的状态容器（例如 MutableStateFlow）。每次收到的 [Progress] 都是独立快照。
+ *
  * @param interval 进度监听器刷新的间隔时间, 单位为毫秒, 默认值为500ms
  */
 abstract class ProgressListener(var interval: Long = 500) {

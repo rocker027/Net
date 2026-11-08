@@ -34,7 +34,11 @@ android {
         enabled = true
     }
 
-    buildFeatures { compose true }
+    buildFeatures {
+        compose true
+        // 一般布局生成 ViewBinding；<layout> 布局仍由 DataBinding 处理。
+        viewBinding true
+    }
     composeOptions { kotlinCompilerExtensionVersion '1.4.3' }
 
     testOptions {

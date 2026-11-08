@@ -25,10 +25,6 @@
 package com.drake.net.scope
 
 import android.view.View
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.findViewTreeLifecycleOwner
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 
@@ -42,10 +38,7 @@ class ViewCoroutineScope(
 ) : NetCoroutineScope(dispatcher = dispatcher) {
 
     init {
-        view.findViewTreeLifecycleOwner()?.lifecycle?.addObserver(object : LifecycleEventObserver {
-            override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
-                if (event == Lifecycle.Event.ON_DESTROY) cancel()
-            }
-        })
+        // 祖先链尚无 LifecycleOwner（例如尚未加入父层的 view）时，attach 后再绑定。
+        view.observeViewTreeDestroy { cancel() }
     }
 }

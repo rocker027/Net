@@ -96,7 +96,7 @@ val result = netResult { netGet<String>("/profile") }
 result.dispatchError { error -> error.httpCode == 404 }
 ```
 
-既有 `Get().await()` 與 Scope 保留。新 API 預設無 Toast 副作用，不自動重試。完整 imports、錯誤分發契約與遷移方式見 [MVVM／MVI／Compose 指南](docs/state-api.md)；sample 選單提供可編譯的兩種架構示範。新增 API 需從目前原始碼重新建置，舊 dist AAR 不會自動更新。
+既有 `Get().await()` 與 Scope 保留。新 API 預設無 Toast 副作用，不自動重試。完整 imports、錯誤分發契約與遷移方式見 [MVVM／MVI／Compose 指南](docs/state-api.md)；同一個 ViewModel 在 ViewBinding／DataBinding 的接法見 [View 系統指南](docs/view-system.md)。sample 選單提供 Compose、ViewBinding、DataBinding 三種可編譯示範。新增 API 需從目前原始碼重新建置，舊 dist AAR 不會自動更新。
 
 ## 安装
 

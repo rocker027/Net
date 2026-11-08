@@ -149,7 +149,7 @@ fun Response.file(): File? {
                         intervalByteCount = fileSize
                         finish = true
                     }
-                    request.tagOf<NetTag.DownloadListeners>()?.forEach { it.onProgress(progress) }
+                    request.tagOf<NetTag.DownloadListeners>()?.forEach { it.onProgress(progress.snapshot()) }
                     return@use requestedFile
                 }
             }

@@ -12,6 +12,16 @@
         android:label="MVVM / MVI Compose" />
 
     <fragment
+        android:id="@+id/modern_view_binding"
+        android:name="com.drake.net.sample.modern.ModernViewBindingFragment"
+        android:label="MVVM ViewBinding" />
+
+    <fragment
+        android:id="@+id/modern_data_binding"
+        android:name="com.drake.net.sample.modern.ModernDataBindingFragment"
+        android:label="MVVM DataBinding" />
+
+    <fragment
         android:id="@+id/async_task"
         android:name="com.drake.net.sample.ui.fragment.AsyncTaskFragment"
         android:label="异步任务"

@@ -29,7 +29,6 @@ import android.view.View
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import com.drake.brv.PageRefreshLayout
 import com.drake.net.scope.AndroidScope
@@ -38,6 +37,7 @@ import com.drake.net.scope.NetCoroutineScope
 import com.drake.net.scope.PageCoroutineScope
 import com.drake.net.scope.StateCoroutineScope
 import com.drake.net.scope.ViewCoroutineScope
+import com.drake.net.scope.observeViewLifecycleEventOnce
 import com.drake.statelayout.StateLayout
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -80,7 +80,7 @@ fun LifecycleOwner.scopeLife(
 /**
  * 异步作用域
  *
- * 该作用域生命周期跟随[Fragment]
+ * 该作用域生命周期跟随[Fragment]的 view：已有 view 时绑定当前 viewLifecycleOwner，尚无 view 时绑定下一个 view
  * @param lifeEvent 生命周期事件, 默认为[Lifecycle.Event.ON_DESTROY]下取消协程作用域
  * @param dispatcher 调度器, 默认运行在[Dispatchers.Main]即主线程下
  */
@@ -90,13 +90,7 @@ fun Fragment.scopeLife(
     block: suspend CoroutineScope.() -> Unit
 ): AndroidScope {
     val coroutineScope = AndroidScope(dispatcher = dispatcher).launch(block)
-    viewLifecycleOwnerLiveData.observe(this) {
-        it?.lifecycle?.addObserver(object : LifecycleEventObserver {
-            override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
-                if (lifeEvent == event) coroutineScope.cancel()
-            }
-        })
-    }
+    observeViewLifecycleEventOnce(lifeEvent) { coroutineScope.cancel() }
     return coroutineScope
 }
 //</editor-fold>
@@ -122,7 +116,8 @@ fun FragmentActivity.scopeDialog(
 /**
  * 作用域开始时自动显示加载对话框, 结束时自动关闭加载对话框
  * 可以设置全局对话框 [com.drake.net.NetConfig.dialogFactory]
- * 对话框被取消或者界面关闭作用域被取消
+ * 对话框被取消、Fragment 的 view 销毁或 Activity 销毁时作用域被取消
+ * 尚无 view 时调用（例如 onCreate）会在下一个 view 销毁时取消
  * @param dialog 仅该作用域使用的对话框
  * @param cancelable 对话框是否可取消
  * @param dispatcher 调度器, 默认运行在[Dispatchers.Main]即主线程下
@@ -132,7 +127,12 @@ fun Fragment.scopeDialog(
     cancelable: Boolean? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Main,
     block: suspend CoroutineScope.() -> Unit
-) = DialogCoroutineScope(requireActivity(), dialog, cancelable, dispatcher).launch(block)
+): NetCoroutineScope {
+    val coroutineScope = DialogCoroutineScope(requireActivity(), dialog, cancelable, dispatcher).launch(block)
+    // 对话框作用域依附 Activity；Fragment 的 view 销毁后继续执行会访问已释放的 binding。
+    observeViewLifecycleEventOnce(Lifecycle.Event.ON_DESTROY) { coroutineScope.cancel() }
+    return coroutineScope
+}
 
 // </editor-fold>
 
@@ -227,6 +227,7 @@ fun LifecycleOwner.scopeNetLife(
 
 /**
  * 和[scopeNetLife]功能相同, 只是接受者为Fragment
+ * 生命周期跟随 Fragment 的 view：已有 view 时绑定当前 viewLifecycleOwner，尚无 view 时绑定下一个 view
  *
  * @param lifeEvent 生命周期事件, 默认为[Lifecycle.Event.ON_DESTROY]下取消协程作用域
  * @param dispatcher 调度器, 默认运行在[Dispatchers.Main]即主线程下
@@ -237,13 +238,7 @@ fun Fragment.scopeNetLife(
     block: suspend CoroutineScope.() -> Unit
 ): NetCoroutineScope {
     val coroutineScope = NetCoroutineScope(dispatcher = dispatcher).launch(block)
-    viewLifecycleOwnerLiveData.observe(this) {
-        it?.lifecycle?.addObserver(object : LifecycleEventObserver {
-            override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
-                if (lifeEvent == event) coroutineScope.cancel()
-            }
-        })
-    }
+    observeViewLifecycleEventOnce(lifeEvent) { coroutineScope.cancel() }
     return coroutineScope
 }
 

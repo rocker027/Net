@@ -44,8 +44,8 @@ class EditDebounceFragment :
             }
         }
 
-        // distinctUntilChanged 表示过滤掉重复结果
-        binding.etInput.debounce().distinctUntilChanged().launchIn(this) {
+        // distinctUntilChanged 表示过滤掉重复结果；收集会访问 binding，跟随 view 生命周期
+        binding.etInput.debounce().distinctUntilChanged().launchIn(viewLifecycleOwner) {
             scope?.cancel() // 发起新的请求前取消旧的请求, 避免旧数据覆盖新数据
             searchText = it
             if (it.isBlank()) {

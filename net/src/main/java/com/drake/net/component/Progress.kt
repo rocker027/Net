@@ -34,8 +34,18 @@ import com.drake.net.NetConfig
 
 /**
  * 下载/上传进度信息
+ *
+ * 每次 [com.drake.net.interfaces.ProgressListener.onProgress] 都会收到独立快照，之后的进度更新不会改动已交出的实例，
+ * 因此可直接写入 StateFlow、Compose State 或 ObservableField。回调在 OkHttp 读写请求体/响应体的线程执行。
+ *
+ * @param startElapsedRealtime 开始下载/上传的开机时间
  */
-class Progress {
+class Progress internal constructor(
+    /** 开始下载的时间 */
+    val startElapsedRealtime: Long
+) {
+
+    constructor() : this(SystemClock.elapsedRealtime())
 
     /** 当前已经完成的字节数 */
     var currentByteCount: Long = 0
@@ -57,9 +67,6 @@ class Progress {
     var finish: Boolean = false
         internal set
 
-    /** 开始下载的时间 */
-    val startElapsedRealtime: Long = SystemClock.elapsedRealtime()
-
     /**
      * 每秒下载速度, 字节单位
      */
@@ -72,6 +79,16 @@ class Progress {
                 field
             }
         }
+
+    /** 复制目前的进度；交给监听器的总是快照，内部累计对象不外泄。 */
+    internal fun snapshot(): Progress = Progress(startElapsedRealtime).also {
+        it.currentByteCount = currentByteCount
+        it.totalByteCount = totalByteCount
+        it.intervalByteCount = intervalByteCount
+        it.intervalTime = intervalTime
+        it.finish = finish
+        it.speedBytes = speedBytes
+    }
 
     override fun toString(): String {
         return "Progress(currentByteCount=$currentByteCount, totalByteCount=$totalByteCount, finish=$finish)"

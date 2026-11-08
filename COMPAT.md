@@ -1,7 +1,7 @@
 # Net fork 相容基線（COMPAT）
 
 - **建立日期**：2026-10-06
-- **更新日期**：2026-10-22
+- **更新日期**：2026-11-08
 - **上游**：liangjingkanji/Net `3.7.0`（功能提交 `1d4f621`）
 - **本倉庫 HEAD（開工時）**：`0d2ab60`（`rocker027/Net`）
 - **Initiative**：`AISDLC-2026-1006-net-compat-fork`
@@ -114,6 +114,26 @@ dc-ned-android 以 OkHttp 5.3.2、協程 1.10.2 消費 `3.7.0-compat.1` 時發�
 - 保留既有 Get／Post／Scope／errorHandler。新 dispatcher 不自動呼叫舊 Toast handler。
 - `NetErrorKind.of` 對任意深度取消優先分類，避免 converter 包裝掩蓋取消；cause 循環會終止。原生 SocketTimeoutException → TIMEOUT，其他原生 IOException → NETWORK。
 - 新 API 需重新建置接入，未更新版本號、dist AAR 或執行發布。行為與遷移見 [state-api](docs/state-api.md)。
+
+## Compose／ViewBinding／DataBinding 整合（2026-11-08；`AISDLC-2026-1108-net-ui-binding`；目前原始碼）
+
+| 項目 | 修正前 | 修正後 | 測試 |
+| --- | --- | --- | --- |
+| 進度回呼 | 每次回呼傳同一個可變 `Progress`；寫入 StateFlow、Compose state、`ObservableField` 時因相等而不再通知 | 每次回呼傳獨立快照，之後的更新不改動已交出的實例；多監聽器仍各自收到 finish | `ProgressListenersTest` |
+| `Fragment.scopeDialog` | 只跟 Activity 生命週期，Fragment 的 view 銷毀後仍執行 | Fragment 的 view 銷毀時也取消並關閉對話框 | `FragmentScopeLifecycleTest` |
+| `Fragment.scopeLife`／`scopeNetLife` | 每次呼叫都在 `viewLifecycleOwnerLiveData` 留一個觀察者直到 Fragment 銷毀 | 已有 view 時直接綁定目前 view；尚無 view 時綁定下一個 view 後移除觀察者 | `FragmentScopeLifecycleTest` |
+| `View.scopeNetLife`、`StateLayout.scope`、`PageRefreshLayout.scope` | 祖先鏈尚無 LifecycleOwner（例如尚未加入父層的 view）時永遠不會自動取消 | 第一次 attach 時再找 owner 並綁定；已 attach 仍找不到時記錄 debug 日誌 | `ViewScopeLifecycleTest`（`View.scopeNetLife`；另兩者共用同一 helper，因 BRV 為 compileOnly 未直接測） |
+
+**行為變更**：
+- 保存 `Progress` 參考並期待它被後續回呼更新的程式，需改成每次回呼讀取新值。
+- 在 Fragment 呼叫 `scopeDialog` 的區塊，導航離開（view 銷毀）時會被取消。需要跨 view 重建保留的請求請改由 ViewModel 發起。
+- 在 `onCreate` 等尚無 view 時呼叫 `Fragment.scopeDialog`，會在下一個 view 銷毀時取消。
+- view 銷毀造成的取消會讓 `finally` 帶著 `CancellationException` 執行（`catch` 不會因取消被呼叫）；使用 `Dispatchers.Main` 時在 `onDestroyView` 之後，不可存取 binding。
+- 不變的限制：Fragment 版作用域在 `onDestroyView` 之中或之後呼叫、且之後沒有新 view，或用於沒有 view 的 DialogFragment 時，不會自動取消。在 owner 已銷毀的 view 上建立 View 作用域也不會自動取消。
+- `Interval.life(fragment)` 維持原行為（每個 view 都綁定），因為 Interval 可重複啟動。
+- `Flow.launchIn(owner)` 行為不變，只補文件：Fragment 請傳 `viewLifecycleOwner`。
+
+sample 新增 ViewBinding 與 DataBinding 畫面，與 Compose 共用 `DemoMvvmViewModel`；文件見 [view-system](docs/view-system.md)。未更新版本號、dist AAR 或執行發布。
 
 ## 尚未完成
 

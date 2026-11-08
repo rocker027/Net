@@ -55,6 +55,41 @@ scopeNetLife {
     `Net.addXXListener()`可以根据`Id`任意位置监听请求
 
 
+## 寫入 StateFlow 或 Compose
+
+每次回呼收到的 `Progress` 都是獨立快照，之後的進度更新不會改動已交出的實例。可以直接寫入 `MutableStateFlow`，由 Compose、ViewBinding 或 DataBinding 收集。
+
+```kotlin
+class DownloadViewModel : ViewModel() {
+    private val mutableProgress = MutableStateFlow<Progress?>(null)
+    val progress = mutableProgress.asStateFlow()
+    private val mutableResult = MutableStateFlow<NetState<File>>(NetState.Idle)
+    val result = mutableResult.asStateFlow()
+
+    fun download(dir: File) = viewModelScope.launch {
+        mutableResult.value = NetState.Loading
+        // netResult 把失敗轉成 Failure，避免例外讓 viewModelScope 崩潰；取消仍向外傳遞
+        mutableResult.value = netResult {
+            netGet<File>("https://example.com/app.apk") {
+                setDownloadDir(dir)
+                addDownloadListener(object : ProgressListener() {
+                    // 回呼在 OkHttp 的 IO 執行緒；MutableStateFlow 可跨執行緒寫入
+                    override fun onProgress(p: Progress) {
+                        mutableProgress.value = p
+                    }
+                })
+            }
+        }.toState()
+    }
+}
+```
+
+!!! warning "回呼執行緒"
+    `onProgress` 在 OkHttp 讀寫請求體／回應體的執行緒執行，不是主執行緒。直接更新 View 前請切回主執行緒（例如 `view.post`）。
+
+!!! note "相容性"
+    舊版每次回呼都傳同一個可變物件。保存 `p` 參考並期待它持續更新的程式，需改成在每次回呼讀取新值。
+
 ## 监听器
 
 实现`ProgressListener`监听进度信息, 进度信息为`Progress`

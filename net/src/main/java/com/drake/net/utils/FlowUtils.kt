@@ -39,6 +39,11 @@ import kotlinx.coroutines.flow.debounce
 
 /**
  * Flow直接创建作用域
+ *
+ * 会持续收集到 [event] 才取消，界面进入后台（STOPPED）时不会暂停。
+ * Fragment 请传入 viewLifecycleOwner，避免 view 销毁后仍更新 binding；
+ * 需要在后台暂停收集时，请改用 `viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED)`。
+ *
  * @param owner 跟随的生命周期组件
  * @param event 销毁时机
  * @param dispatcher 指定调度器

@@ -93,6 +93,7 @@ nav:
   - 切换线程: thread.md
   - ViewModel: view-model.md
   - MVVM / MVI / Compose: state-api.md
+  - ViewBinding / DataBinding: view-system.md
   - 异常追踪: track.md
   - 错误处理:
       - 错误处理: error.md

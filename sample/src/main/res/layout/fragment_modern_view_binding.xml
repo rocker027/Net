@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 一般布局（无 <layout> 标签），由 ViewBinding 生成 FragmentModernViewBindingBinding。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    tools:context=".modern.ModernViewBindingFragment">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:text="ViewBinding + StateFlow：所有 API 由本机 MockWebServer 回应。先点慢请求再点成功，可验证旧请求取消。" />
+
+    <Button
+        android:id="@+id/btnSuccess"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="请求成功" />
+
+    <Button
+        android:id="@+id/btnHttpError"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="HTTP 503（全域错误提示）" />
+
+    <Button
+        android:id="@+id/btnSlow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="慢请求（2 秒）" />
+
+    <ProgressBar
+        android:id="@+id/progress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvState"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="等待请求" />
+
+</LinearLayout>

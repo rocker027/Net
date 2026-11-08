@@ -6,6 +6,14 @@
         android:icon="@drawable/ic_view_model"
         android:title="MVVM / MVI Compose" />
     <item
+        android:id="@+id/modern_view_binding"
+        android:icon="@drawable/ic_view_model"
+        android:title="MVVM ViewBinding" />
+    <item
+        android:id="@+id/modern_data_binding"
+        android:icon="@drawable/ic_view_model"
+        android:title="MVVM DataBinding" />
+    <item
         android:id="@+id/simple_request"
         android:icon="@drawable/ic_simple_request"
         android:title="简单请求" />

@@ -86,7 +86,7 @@ class NetResponseBody(
                 if (!progressListeners.isNullOrEmpty()) {
                     readByteCount += if (bytesRead != -1L) bytesRead else 0
                     val currentElapsedTime = SystemClock.elapsedRealtime()
-                    // 監聽器共用同一個 progress：先固定本次狀態，避免第一個監聽器設定 finish 後其餘監聽器收不到完成事件
+                    // 監聽器共用同一個累計 progress：先固定本次狀態，避免第一個監聽器設定 finish 後其餘監聽器收不到完成事件；回呼交出快照
                     val wasFinished = progress.finish
                     val reachedEnd = readByteCount == contentLength || bytesRead == -1L
                     progressListeners.forEach { progressListener ->
@@ -102,7 +102,7 @@ class NetResponseBody(
                                     totalByteCount = contentLength
                                     intervalByteCount = progressListener.intervalByteCount
                                     intervalTime = currentInterval
-                                }
+                                }.snapshot()
                             )
                             progressListener.elapsedTime = currentElapsedTime
                             progressListener.intervalByteCount = 0L
