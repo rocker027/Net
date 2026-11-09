@@ -129,11 +129,32 @@ dc-ned-android 以 OkHttp 5.3.2、協程 1.10.2 消費 `3.7.0-compat.1` 時發�
 - 在 Fragment 呼叫 `scopeDialog` 的區塊，導航離開（view 銷毀）時會被取消。需要跨 view 重建保留的請求請改由 ViewModel 發起。
 - 在 `onCreate` 等尚無 view 時呼叫 `Fragment.scopeDialog`，會在下一個 view 銷毀時取消。
 - view 銷毀造成的取消會讓 `finally` 帶著 `CancellationException` 執行（`catch` 不會因取消被呼叫）；使用 `Dispatchers.Main` 時在 `onDestroyView` 之後，不可存取 binding。
-- 不變的限制：Fragment 版作用域在 `onDestroyView` 之中或之後呼叫、且之後沒有新 view，或用於沒有 view 的 DialogFragment 時，不會自動取消。在 owner 已銷毀的 view 上建立 View 作用域也不會自動取消。
+- 不變的限制：Fragment 版作用域在 `onDestroyView` 之中或之後呼叫、且之後沒有新 view，或用於沒有 view 的 DialogFragment 時，不會自動取消。在 owner 已銷毀的 view 上建立 View 作用域也不會自動取消（已於下一節 `AISDLC-2026-1108-net-scope-retention` 修正）。
 - `Interval.life(fragment)` 維持原行為（每個 view 都綁定），因為 Interval 可重複啟動。
 - `Flow.launchIn(owner)` 行為不變，只補文件：Fragment 請傳 `viewLifecycleOwner`。
 
 sample 新增 ViewBinding 與 DataBinding 畫面，與 Compose 共用 `DemoMvvmViewModel`；文件見 [view-system](docs/view-system.md)。未更新版本號、dist AAR 或執行發布。
+
+## 作用域保留與綁定剩餘問題（2026-11-08；`AISDLC-2026-1108-net-scope-retention`；目前原始碼）
+
+| 項目 | 修正前 | 修正後 | 測試 |
+| --- | --- | --- | --- |
+| 生命週期觀察者保留作用域 | `LifecycleOwner.scopeLife／scopeNetLife`、Fragment 版與 View 版作用域的觀察者強引用作用域，完成後仍連同回呼留到 owner 銷毀 | 觀察者強引用 SupervisorJob、弱引用作用域；完成後可回收，執行中的作用域仍在事件時取消（含取消網路請求） | `ScopeRetentionTest`、`AndroidScopeTest` |
+| `scopeDialog` 的 Activity 觀察者 | 建構時註冊，從不移除 | 作用域執行期間註冊（start 到最後一個 launch 結束），結束時在主執行緒關閉對話框並移除；同一作用域還有其他 launch 時保留 | `ScopeRetentionTest` |
+| owner 已銷毀的 View 作用域 | 綁到已銷毀的 owner，永遠不會自動取消 | 視同尚無 owner，下一次 attach 時重新查詢並綁定；請求照常執行 | `ScopeRetentionTest.scopeCreatedOnReusedRootBindsToTheNewViewLifecycle` |
+| `StateLayout.scope` 測試 | BRV 只在 compileOnly，沒有直接測試 | net 加入 BRV testImplementation，直接測試綁定與完成後回收 | `ScopeRetentionTest` |
+| internal helper | bytecode 為 public，Java 可呼叫 | 加上 `@JvmSynthetic` | 編譯 |
+
+**行為變更**：
+- 生命週期事件只取消一次並移除觀察者。作用域取消後無法再使用，一般情況與原本重複呼叫 `cancel()` 的結果相同。
+- 子類覆寫 `cancel()` 加入額外副作用時：只會在第一次事件呼叫一次；作用域已完成並被回收時，只取消其 Job，不呼叫子類的 `cancel()`。
+- 觀察者物件本身（不含作用域）仍保留到事件發生或 owner 銷毀。
+- 子類覆寫 `coroutineContext` 時必須保留父類的 Job（例如 `super.coroutineContext + CoroutineName(...)`）；換成另一個 Job 時，弱引用的可達性保證不成立。
+- `scopeDialog` 的作用域上若另有 kotlinx `launch`、直接呼叫的 `Get` 等子協程，只有作用域的 `launch(block)` 結束時會移除 Activity 觀察者，而且要當下沒有其他子協程。觀察者因此可能保留到 Activity 銷毀，或同一作用域下一個 `launch(block)` 結束，與舊版的「保留到 Activity 銷毀」相比沒有更差。
+- `scopeDialog` 結束時，關閉對話框改在主執行緒執行。背景執行緒投遞的顯示區塊若晚於結束才執行，會直接略過，不顯示也不註冊。使用者的 `finally` 回呼拋錯時，仍會關閉對話框並移除觀察者。
+- view 在 owner 銷毀後不再 attach 時，作用域不會自動取消（與舊版相同）。
+- `PageRefreshLayout.scope` 與 StateLayout 共用同一個 helper，沒有獨立測試。
+- `ViewModel.scopeLife／scopeNetLife` 的 `addCloseable` 仍強引用作用域到 ViewModel 清除為止，不在本次範圍。
 
 ## 尚未完成
 

@@ -37,7 +37,7 @@
 !!! note "Fragment 與 View 的生命週期綁定"
     - `Fragment.scopeLife`／`Fragment.scopeNetLife`／`Fragment.scopeDialog` 跟隨 Fragment 的 view：呼叫時已有 view 就綁定目前的 view，尚無 view 則綁定下一個 view。
     - `Fragment.scopeDialog` 除了對話框取消與 Activity 銷毀，Fragment 的 view 銷毀時也會取消並關閉對話框。
-    - `View.scopeNetLife`、`StateLayout.scope`、`PageRefreshLayout.scope` 在祖先鏈尚無 LifecycleOwner 時建立（例如尚未加入父層的 view），會在第一次 attach 後綁定。
+    - `View.scopeNetLife`、`StateLayout.scope`、`PageRefreshLayout.scope` 在祖先鏈尚無 LifecycleOwner 時建立（例如尚未加入父層的 view），會在第一次 attach 後綁定；owner 已銷毀時（例如重用的 root view）在下一次 attach 時重新綁定。
     - 完整規則與 ViewBinding 寫法見 [ViewBinding 與 DataBinding](view-system.md)。
 
 !!! quote "第三方库支持"

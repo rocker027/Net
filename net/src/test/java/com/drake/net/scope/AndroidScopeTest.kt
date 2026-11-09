@@ -3,6 +3,7 @@ package com.drake.net.scope
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import org.junit.Assert.assertFalse
@@ -11,6 +12,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.coroutines.CoroutineContext
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], manifest = Config.NONE)
@@ -46,6 +48,15 @@ class AndroidScopeTest {
     fun netScopeAlsoSupportsSynchronousLifecycleCancellation() {
         val scope = NetCoroutineScope(resumedOwner(), Lifecycle.Event.ON_START, Dispatchers.Unconfined)
         assertFalse(requireNotNull(scope.coroutineContext[Job]).isActive)
+    }
+
+    @Test
+    fun subclassOverridingCoroutineContextCanBeConstructed() {
+        // 子類以帶初始值的屬性覆寫 coroutineContext 時，父類建構期間不可讀取它（欄位此時仍為 null）。
+        val scope = object : AndroidScope(resumedOwner(), dispatcher = Dispatchers.Unconfined) {
+            override val coroutineContext: CoroutineContext = super.coroutineContext + CoroutineName("named")
+        }
+        assertTrue(requireNotNull(scope.coroutineContext[Job]).isActive)
     }
 
     private fun resumedOwner() = Owner().apply {

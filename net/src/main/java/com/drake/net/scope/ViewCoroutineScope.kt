@@ -38,7 +38,7 @@ class ViewCoroutineScope(
 ) : NetCoroutineScope(dispatcher = dispatcher) {
 
     init {
-        // 祖先链尚无 LifecycleOwner（例如尚未加入父层的 view）时，attach 后再绑定。
-        view.observeViewTreeDestroy { cancel() }
+        // 祖先链尚无 LifecycleOwner（例如尚未加入父层的 view）时，attach 后再绑定；观察者只弱引用作用域。
+        view.observeViewTreeDestroy(weakCanceller())
     }
 }

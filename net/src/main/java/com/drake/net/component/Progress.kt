@@ -81,6 +81,7 @@ class Progress internal constructor(
         }
 
     /** 复制目前的进度；交给监听器的总是快照，内部累计对象不外泄。 */
+    @JvmSynthetic
     internal fun snapshot(): Progress = Progress(startElapsedRealtime).also {
         it.currentByteCount = currentByteCount
         it.totalByteCount = totalByteCount

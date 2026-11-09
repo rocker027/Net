@@ -97,14 +97,16 @@ fun bindNetStateText(view: TextView, state: NetState<*>?) {
 | --- | --- |
 | `Fragment.scopeLife`／`Fragment.scopeNetLife` | 呼叫時已有 view：目前 view 到 `lifeEvent`。尚無 view：下一個 view 到 `lifeEvent` |
 | `Fragment.scopeDialog` | 對話框被取消、Fragment 的 view 銷毀或 Activity 銷毀，取最早者 |
-| `View.scopeNetLife`、`StateLayout.scope`、`PageRefreshLayout.scope` | view tree 的 LifecycleOwner 銷毀。祖先鏈尚無 owner（例如尚未加入父層的 view）時，在第一次 attach 後綁定 |
+| `View.scopeNetLife`、`StateLayout.scope`、`PageRefreshLayout.scope` | view tree 的 LifecycleOwner 銷毀。祖先鏈尚無 owner（例如尚未加入父層的 view）或 owner 已銷毀時，在下一次 attach 後綁定 |
 | `Flow.launchIn(owner)` | owner 到 `event` 才取消，背景時不暫停 |
 
 - 在 `onDestroyView` 之中或之後、下一個 view 建立前呼叫 Fragment 版作用域，要到下一個 view 銷毀才會取消。這段期間不要存取 binding。
 - 以下情況 Fragment 版作用域不會自動取消，只會等請求自然結束：上述時段呼叫後 Fragment 沒有再建立 view 就銷毀；只覆寫 `onCreateDialog`、沒有 view 的 DialogFragment。後者的 `scopeDialog` 仍會在對話框取消或 Activity 銷毀時取消。
 - view 銷毀造成的取消，`finally` 會帶著 `CancellationException` 執行，`catch` 不會因取消被呼叫。使用預設的 `Dispatchers.Main` 時，`finally` 在 `onDestroyView` 之後才執行，不可在裡面存取 binding。
 - View 作用域已 attach 但找不到 LifecycleOwner 時（例如不是 `ComponentActivity` 的畫面），不會自動取消。開啟 `NetConfig.debug` 時會記錄一行日誌。
-- 在 owner 已銷毀的 view 上建立 View 作用域（例如 Fragment 重用上一個 view 的 root，或在 `onDestroyView` 內建立），不會自動取消，與舊版相同。
+- 在 owner 已銷毀的 view 上建立 View 作用域（例如 Fragment 重用上一個 view 的 root），請求照常執行，並在 view 下一次 attach 時綁定新的 owner。view 之後不再 attach（例如在 `onDestroyView` 內對即將丟棄的 view 建立）時，不會自動取消。
+- 作用域完成後，生命週期觀察者只弱引用作用域，不會把作用域與其回呼留到 owner 銷毀。執行中的作用域不受影響，仍會在生命週期事件時取消。
+- `scopeDialog` 只在作用域執行期間（start 到最後一個 launch 結束）於 Activity 掛觀察者，結束後移除。作用域上另有 kotlinx `launch` 等子協程時，觀察者可能保留到 Activity 銷毀。
 - view 從畫面 detach 不會取消 View 作用域。RecyclerView 等容器會反覆 detach 和 attach 同一個 view。
 - `Flow.launchIn(owner)` 在 Fragment 請傳 `viewLifecycleOwner`。需要在背景暫停時，改用上方 `repeatOnLifecycle` 寫法。
 

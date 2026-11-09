@@ -38,6 +38,7 @@ import com.drake.net.scope.PageCoroutineScope
 import com.drake.net.scope.StateCoroutineScope
 import com.drake.net.scope.ViewCoroutineScope
 import com.drake.net.scope.observeViewLifecycleEventOnce
+import com.drake.net.scope.weakCanceller
 import com.drake.statelayout.StateLayout
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -90,7 +91,7 @@ fun Fragment.scopeLife(
     block: suspend CoroutineScope.() -> Unit
 ): AndroidScope {
     val coroutineScope = AndroidScope(dispatcher = dispatcher).launch(block)
-    observeViewLifecycleEventOnce(lifeEvent) { coroutineScope.cancel() }
+    observeViewLifecycleEventOnce(lifeEvent, coroutineScope.weakCanceller())
     return coroutineScope
 }
 //</editor-fold>
@@ -130,7 +131,7 @@ fun Fragment.scopeDialog(
 ): NetCoroutineScope {
     val coroutineScope = DialogCoroutineScope(requireActivity(), dialog, cancelable, dispatcher).launch(block)
     // 对话框作用域依附 Activity；Fragment 的 view 销毁后继续执行会访问已释放的 binding。
-    observeViewLifecycleEventOnce(Lifecycle.Event.ON_DESTROY) { coroutineScope.cancel() }
+    observeViewLifecycleEventOnce(Lifecycle.Event.ON_DESTROY, coroutineScope.weakCanceller())
     return coroutineScope
 }
 
@@ -238,7 +239,7 @@ fun Fragment.scopeNetLife(
     block: suspend CoroutineScope.() -> Unit
 ): NetCoroutineScope {
     val coroutineScope = NetCoroutineScope(dispatcher = dispatcher).launch(block)
-    observeViewLifecycleEventOnce(lifeEvent) { coroutineScope.cancel() }
+    observeViewLifecycleEventOnce(lifeEvent, coroutineScope.weakCanceller())
     return coroutineScope
 }
 

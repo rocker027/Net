@@ -25,7 +25,6 @@
 package com.drake.net.scope
 
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import com.drake.net.Net
 import com.drake.net.utils.runMain
@@ -54,17 +53,18 @@ open class AndroidScope(
 
     val scopeGroup = exceptionHandler
 
+    // 建构期间只用这个字段，不读取可被子类覆写的 coroutineContext。
+    private val supervisorJob = SupervisorJob()
+
     override val coroutineContext: CoroutineContext =
-        dispatcher + exceptionHandler + SupervisorJob()
+        dispatcher + exceptionHandler + supervisorJob
 
     init {
         // addObserver 会同步补发生命周期事件，取消所需的字段必须先初始化。
+        // 观察者只弱引用作用域：完成后不被 owner 留住；执行中的子协程会经由 SupervisorJob 保持作用域可达。
+        val cancelScope = weakCanceller(supervisorJob)
         runMain {
-            lifecycleOwner?.lifecycle?.addObserver(object : LifecycleEventObserver {
-                override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
-                    if (lifeEvent == event) cancel()
-                }
-            })
+            lifecycleOwner?.observeEventOnce(lifeEvent, cancelScope)
         }
     }
 

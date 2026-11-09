@@ -59,6 +59,8 @@ dependencies {
     testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutine_version"
     // 與目前 AGP 7.1 / JDK 11 測試工具鏈相容。
     testImplementation "org.robolectric:robolectric:4.10.3"
+    // BRV 在主程式為 compileOnly；測試直接驗證 StateLayout／PageRefreshLayout 作用域。
+    testImplementation "com.github.liangjingkanji:BRV:$brv_version"
 }
 
 afterEvaluate {

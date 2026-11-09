@@ -28,8 +28,10 @@ import android.app.Dialog
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.*
 import com.drake.net.NetConfig
+import com.drake.net.utils.runMain
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 
 /**
  * 自动加载对话框网络请求
@@ -51,18 +53,22 @@ class DialogCoroutineScope(
     dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : NetCoroutineScope(dispatcher = dispatcher), LifecycleObserver {
 
-    init {
-        activity.lifecycle.addObserver(object : LifecycleEventObserver {
-            override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
-                if (event == Lifecycle.Event.ON_DESTROY) {
-                    dialog?.cancel()
-                }
-            }
-        })
+    /**
+     * 只在作用域执行期间（start 到最后一个 launch 结束）挂在 Activity 上：Activity 销毁时取消对话框。
+     * 结束后移除，避免单一 Activity 的 App 一直保留已结束的作用域与其回调。
+     */
+    private val activityObserver = LifecycleEventObserver { _, event ->
+        if (event == Lifecycle.Event.ON_DESTROY) dialog?.cancel()
     }
+
+    /** 仍有执行中的 launch。子协程定案时已先从父 Job 移除，所以 finally 时只会看到其他 launch。 */
+    private fun hasRunningLaunch() = coroutineContext[Job]?.children?.any() == true
 
     override fun start() {
         activity.runOnUiThread {
+            // 背景线程投递的 UI 区块可能晚于已在主线程执行的 finally；作用域已结束就不显示也不注册。
+            if (!hasRunningLaunch()) return@runOnUiThread
+            activity.lifecycle.addObserver(activityObserver)
             val dialog = dialog ?: NetConfig.dialogFactory.onCreate(activity)
             this.dialog = dialog
             cancelable?.let { dialog.setCancelable(it) }
@@ -83,8 +89,16 @@ class DialogCoroutineScope(
     }
 
     override fun finally(e: Throwable?) {
-        super.finally(e)
-        dialog?.dismiss()
+        try {
+            super.finally(e)
+        } finally {
+            // 用户的 finally 回调抛错时仍要关闭对话框并移除观察者。LifecycleRegistry 要求主线程。
+            runMain {
+                dialog?.dismiss()
+                // 同一作用域还有其他 launch 时保留观察者，让 Activity 销毁时仍能取消它们。
+                if (!hasRunningLaunch()) activity.lifecycle.removeObserver(activityObserver)
+            }
+        }
     }
 
 }
