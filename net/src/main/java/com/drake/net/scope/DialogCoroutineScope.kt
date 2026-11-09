@@ -29,6 +29,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.*
 import com.drake.net.NetConfig
 import com.drake.net.utils.runMain
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,6 +42,9 @@ import kotlinx.coroutines.Job
  * 错误: 提示错误信息, 关闭对话框
  * 完全: 关闭对话框
  *
+ * Activity 销毁时取消作用域内所有协程（含 kotlinx launch 的子协程）并同步关闭对话框。
+ * 生命周期观察者只弱引用作用域，结束后不会被 Activity 留住。
+ *
  * @param activity 对话框跟随生命周期的FragmentActivity
  * @param dialog 不使用默认的加载对话框而指定对话框
  * @param cancelable 是否允许用户取消对话框
@@ -51,24 +55,20 @@ class DialogCoroutineScope(
     var dialog: Dialog? = null,
     val cancelable: Boolean? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Main
-) : NetCoroutineScope(dispatcher = dispatcher), LifecycleObserver {
+) : NetCoroutineScope(activity, Lifecycle.Event.ON_DESTROY, dispatcher), LifecycleObserver {
+
+    /** 仍有执行中的协程。子协程定案时已先从父 Job 移除。 */
+    private fun hasRunningLaunch() = coroutineContext[Job]?.children?.any() == true
 
     /**
-     * 只在作用域执行期间（start 到最后一个 launch 结束）挂在 Activity 上：Activity 销毁时取消对话框。
-     * 结束后移除，避免单一 Activity 的 App 一直保留已结束的作用域与其回调。
+     * 背景线程投递的 UI 区块执行时，作用域可能已结束、已取消，或 Activity 已销毁；这些情况都不显示对话框。
      */
-    private val activityObserver = LifecycleEventObserver { _, event ->
-        if (event == Lifecycle.Event.ON_DESTROY) dialog?.cancel()
-    }
-
-    /** 仍有执行中的 launch。子协程定案时已先从父 Job 移除，所以 finally 时只会看到其他 launch。 */
-    private fun hasRunningLaunch() = coroutineContext[Job]?.children?.any() == true
+    private fun canShowDialog() =
+        hasRunningLaunch() && coroutineContext[Job]?.isActive == true && !activity.isDestroyed
 
     override fun start() {
         activity.runOnUiThread {
-            // 背景线程投递的 UI 区块可能晚于已在主线程执行的 finally；作用域已结束就不显示也不注册。
-            if (!hasRunningLaunch()) return@runOnUiThread
-            activity.lifecycle.addObserver(activityObserver)
+            if (!canShowDialog()) return@runOnUiThread
             val dialog = dialog ?: NetConfig.dialogFactory.onCreate(activity)
             this.dialog = dialog
             cancelable?.let { dialog.setCancelable(it) }
@@ -88,15 +88,28 @@ class DialogCoroutineScope(
         }
     }
 
+    /**
+     * 取消时先关闭对话框。Activity 销毁时由生命周期观察者在 onDestroy 内呼叫，
+     * 若等到 finally 才关闭，Activity 已销毁会造成窗口泄漏。Dialog.dismiss 可在任意线程呼叫。
+     */
+    override fun cancel(cause: CancellationException?) {
+        try {
+            dialog?.dismiss()
+        } finally {
+            // 关闭对话框失败（例如窗口已被系统移除）也要取消作用域与网络请求。
+            super.cancel(cause)
+        }
+    }
+
     override fun finally(e: Throwable?) {
         try {
             super.finally(e)
         } finally {
-            // 用户的 finally 回调抛错时仍要关闭对话框并移除观察者。LifecycleRegistry 要求主线程。
+            // 用户的 finally 回调抛错时仍要关闭对话框；与 start 的 UI 区块同在主线程依序执行。
             runMain {
                 dialog?.dismiss()
-                // 同一作用域还有其他 launch 时保留观察者，让 Activity 销毁时仍能取消它们。
-                if (!hasRunningLaunch()) activity.lifecycle.removeObserver(activityObserver)
+                // 呼叫端传入并重复使用的 dialog 可能由 Activity 持有，结束后解除取消监听器对作用域的引用。
+                if (!hasRunningLaunch()) dialog?.setOnCancelListener(null)
             }
         }
     }

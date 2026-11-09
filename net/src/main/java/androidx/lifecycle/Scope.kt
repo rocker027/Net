@@ -26,34 +26,44 @@ package androidx.lifecycle
 
 import com.drake.net.scope.AndroidScope
 import com.drake.net.scope.NetCoroutineScope
+import com.drake.net.scope.weakCanceller
 import com.drake.net.time.Interval
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import java.io.Closeable
 
 /**
  * 在[ViewModel]被销毁时取消协程作用域
+ * ViewModel 只弱引用作用域：完成后可被回收，执行中的作用域仍会在 ViewModel 清除时取消
  */
 fun ViewModel.scopeLife(
     dispatcher: CoroutineDispatcher = Dispatchers.Main,
     block: suspend CoroutineScope.() -> Unit
 ): AndroidScope {
     val scope = AndroidScope(dispatcher = dispatcher).launch(block)
-    addCloseable(scope)
+    addWeakCloseable(scope)
     return scope
 }
 
 /**
  * 在[ViewModel]被销毁时取消协程作用域以及其中的网络请求
  * 具备网络错误全局处理功能, 其内部的网络请求会跟随其作用域的生命周期
+ * ViewModel 只弱引用作用域：完成后可被回收，执行中的作用域仍会在 ViewModel 清除时取消
  */
 fun ViewModel.scopeNetLife(
     dispatcher: CoroutineDispatcher = Dispatchers.Main,
     block: suspend CoroutineScope.() -> Unit
 ): NetCoroutineScope {
     val scope = NetCoroutineScope(dispatcher = dispatcher).launch(block)
-    addCloseable(scope)
+    addWeakCloseable(scope)
     return scope
+}
+
+/** ViewModel 的 closeable 集合会保留到清除为止，因此只放入弱引用作用域的取消动作。 */
+private fun ViewModel.addWeakCloseable(scope: AndroidScope) {
+    val cancelScope = scope.weakCanceller()
+    addCloseable(Closeable { cancelScope() })
 }
 
 /** 轮询器根据ViewModel生命周期自动取消 */

@@ -1,4 +1,4 @@
-新接入建議使用 [MVVM／MVI／Compose 指南](state-api.md) 的 suspend、NetResult 與 StateFlow。Repository 負責資料請求，ViewModel 負責畫面狀態。ViewBinding 與 DataBinding 的收集方式見 [ViewBinding 與 DataBinding](view-system.md)，DataBinding 可直接綁 StateFlow，不需要 LiveData。下方保留舊版 LiveData／Scope 的相容用法。
+新接入建議使用 [MVVM／MVI／Compose 指南](state-api.md) 的 suspend、NetResult 與 StateFlow。Repository 負責資料請求，ViewModel 負責畫面狀態。ViewBinding 與 DataBinding 的收集方式見 [ViewBinding 與 DataBinding](view-system.md)，DataBinding 可直接綁 StateFlow，不需要 LiveData。下方保留舊版 LiveData／Scope 的相容用法。`ViewModel.scopeLife／scopeNetLife` 只弱引用作用域，作用域完成後不會被 ViewModel 留到清除，執行中的作用域仍會在 ViewModel 清除時取消。
 
 !!! Note "漸進遷移"
     既有 `scopeNetLife` 仍可使用；新程式碼可在 `viewModelScope` 呼叫 Repository 的 suspend 方法，再用生命週期感知的方式收集 StateFlow。
